@@ -28,7 +28,9 @@ Implementations of the `CredentialProvider` trait for each supported backend, ea
 
 [→ Specification](docs/spec/credential-provider.md)
 
-## Workspace Layout
+## Workspace Layout (Intended)
+
+The target structure for the fully implemented workspace:
 
 ```
 credential-provider/               # repository root

@@ -142,6 +142,11 @@ where
     inner: P,
     cached: RwLock<Option<C>>,
     refresh_before_expiry: Duration,
+    /// Guards the refresh operation so that only one fetch is in flight
+    /// at a time. When multiple tasks observe a stale or empty cache
+    /// concurrently, the first acquires this mutex and performs the fetch;
+    /// all others wait on the mutex and then read the updated cache.
+    refresh_lock: Mutex<()>,
 }
 
 impl<C, P> CachingCredentialProvider<C, P>

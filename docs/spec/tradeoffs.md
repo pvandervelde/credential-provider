@@ -59,7 +59,7 @@ Alternatives considered during architectural design, with rationale for the chos
 
 **Rationale:** The dominant operation is reading the cache (cache hit path). `RwLock` allows all concurrent reads to proceed without blocking. Writes (refresh) are infrequent. The `tokio::sync` variant is required because the lock must be held across an `.await` point during refresh.
 
-**Note:** The concurrent refresh serialization (only one fetch in flight) may require an additional synchronization mechanism beyond the `RwLock` itself — for example, a `tokio::sync::Semaphore(1)` or a `Mutex`-guarded fetch future. This is an implementation detail the coder should resolve.
+**Note:** Concurrent refresh serialization (only one fetch in flight) is handled by a separate `Mutex<()>` field (`refresh_lock`) on `CachingCredentialProvider`. The `RwLock` protects the cached value; the `Mutex` ensures a single writer performs the fetch while other tasks wait. See the struct definition in [credential-provider-core.md](credential-provider-core.md#cachingcredentialprovider).
 
 ---
 
