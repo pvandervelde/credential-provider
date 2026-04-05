@@ -1,102 +1,123 @@
-# ADR-001: Hexagonal Architecture for Provider Abstraction
+# ADR-001: Hexagonal Architecture for Credential Provider Abstraction
 
 Status: Accepted
 Date: 2026-01-24
-Owners: queue-runtime team
+Owners: credential-provider team
 
 ## Context
 
-The queue-runtime library needs to support multiple cloud providers (Azure Service Bus, AWS SQS) while maintaining identical behavior and API across all of them. Different applications deploy to different cloud environments and need the flexibility to switch providers without code changes or recompilation.
+Services in the stack need credentials at runtime — queue broker connections, webhook secrets, API tokens, TLS certificates, and cloud provider identities. Each service may run in different environments (local development, self-hosted infrastructure with Vault, Azure, AWS), and must obtain credentials from whichever secrets backend is available without coupling service logic to a specific backend.
 
 Previous approaches considered:
-- Provider-specific crates with feature flags (compile-time selection) - limits deployment flexibility
-- Monolithic client with conditional logic - creates spaghetti code, harder to test
-- Separate completely independent implementations - leads to API drift and duplication
+
+- A single monolithic crate with all backends compiled in — heavyweight for library consumers
+- Per-backend crates with no shared abstraction — leads to API drift and duplicated caching logic
+- Trait object in each consumer library — no reuse of caching, refresh, or error handling
 
 ## Decision
 
-Use **Hexagonal Architecture** (Ports and Adapters pattern) to separate business logic from provider implementations:
+Use **Hexagonal Architecture** (Ports and Adapters pattern) to separate credential management business logic from backend implementations, split across two crates:
 
-- **Hexagon (Core)**: Provider-agnostic queue operations, session management, retry logic, message handling
-- **Ports (Interfaces)**: `QueueProvider` and `SessionProvider` traits defining operation contracts
-- **Adapters (Implementations)**: Azure, AWS, and in-memory implementations of the port interfaces
-- **Dependency Direction**: Business logic depends only on port abstractions, never on concrete adapters
+- **Hexagon (Core — `credential-provider-core`)**: Credential types, the `CredentialProvider<C>` trait (the port), `CachingCredentialProvider`, and `CredentialError`. Contains all business logic for validity, caching, refresh, and stale fallback.
+- **Ports (Interfaces)**: The `CredentialProvider<C>` trait — the single abstraction that all backends implement and all consumers depend on.
+- **Adapters (Implementations — `credential-provider`)**: Env, Vault, Azure, and AWS provider implementations, each gated behind a Cargo feature flag.
+- **Dependency Direction**: The adapter crate depends on the core crate. Consumer libraries depend only on the core crate. Applications depend on the adapter crate and wire concrete providers at startup.
 
-This enables runtime provider selection via `QueueClientFactory` based on `ProviderConfig` determined at application startup.
+Backend selection is **compile-time** via Cargo feature flags. Applications enable only the features they need, and unused backend SDKs are not compiled.
 
 ## Consequences
 
 **Enables:**
-- Single codebase supporting all providers
-- Runtime provider selection without recompilation
-- Easy testing against in-memory implementation
-- Clear boundaries between business logic and provider concerns
-- Adding new providers without touching core logic
+
+- Consumer libraries depend only on the lightweight core crate (no backend SDKs in their dependency tree)
+- Adding a new backend requires only a new adapter implementation and feature flag — no changes to core
+- `CachingCredentialProvider` works with any backend via the trait abstraction
+- The `env` adapter provides a zero-dependency test double — no external service needed
+- Clear boundary: business logic (validity, caching, stale fallback) lives in core; backend communication lives in adapters
 
 **Forbids:**
-- Provider-specific optimizations in core business logic
-- Compile-time provider selection via feature flags
-- Direct imports of provider-specific SDKs (Azure SDK, AWS SDK) in business logic
+
+- Backend-specific types in the core crate (no `vaultrs`, `azure-identity`, `aws-config` imports)
+- Consumer libraries depending on the adapter crate directly (they accept `Arc<dyn CredentialProvider<C>>`)
+- Caching logic in adapter implementations (caching is solely the core's responsibility)
 
 **Trade-offs:**
-- Slightly larger binary (all providers compiled in)
-- Potential for provider-specific APIs to diverge if not careful
-- Some performance optimization opportunities sacrificed for abstraction consistency
+
+- Two crates to maintain instead of one, with a versioning relationship between them
+- The port trait (`CredentialProvider<C>`) is intentionally minimal (`get()` only) — backend-specific capabilities are not exposed through the abstraction
 
 ## Alternatives considered
 
-### Option A: Feature-flag-based compile-time selection
-**Why not**: Requires recompilation to change providers; breaks deployment flexibility. Users deploying same application across Azure and AWS would need separate builds.
+### Option A: Single crate with all backends and feature flags
 
-### Option B: Monolithic client with conditional logic
-**Why not**: Core business logic becomes polluted with provider-specific branches; difficult to test in isolation; new providers require touching core logic.
+**Why not**: Consumer libraries would need to depend on the crate even though they only need the trait definition. Feature flags would prevent compilation of unused backends, but the crate would still carry all backend-specific code in its source tree, and consumers would transitively depend on the adapter crate's optional dependency declarations.
 
-### Option C: Separate, independent crate per provider
-**Why not**: API drift over time; duplication of business logic (retry, sessions, errors); harder to maintain consistency.
+### Option B: Per-backend crates with no shared core
+
+**Why not**: Each backend crate would define its own provider trait and credential types. Consumers would need to depend on a specific backend crate, creating tight coupling. Caching logic would be duplicated across every backend. No single abstraction for dependency injection.
+
+### Option C: Shared trait crate with separate adapter crates per backend
+
+**Why not**: Multiplies the number of crates (one per backend) without clear benefit. A single adapter crate with feature flags achieves the same compile-time selection with less packaging overhead. If the adapter crate grows too large in the future, this can be revisited.
 
 ## Implementation notes
 
 **Key boundaries:**
-- Core business logic never imports `azure_core`, `aws_sdk_sqs`, or provider-specific types
-- All provider-specific code lives in `src/providers/` subdirectory
-- Port interfaces (`QueueProvider`, `SessionProvider`) must be provider-neutral
+
+- `credential-provider-core` never imports any backend SDK (`vaultrs`, `azure-identity`, `aws-config`, etc.)
+- `credential-provider` re-exports `credential-provider-core` so applications can use a single dependency
+- All backend-specific code is gated behind feature flags (`env`, `vault`, `azure`, `aws`)
 
 **Testing strategy:**
-- Unit tests use `InMemoryProvider` for speed and determinism
-- Integration tests should test against all three providers (in CI)
-- Contract tests verify each adapter implements port interfaces correctly
 
-**Adding new providers:**
-1. Create new directory under `src/providers/new_provider/`
-2. Implement `QueueProvider` and `SessionProvider` traits
-3. Add `ProviderConfig::NewProvider` variant
-4. Update `QueueClientFactory` to instantiate new provider
-5. Add tests using shared test patterns
+- Unit tests for core use `MockCredentialProvider` — no external services
+- Unit tests for adapters test error mapping and response parsing in isolation
+- Integration tests for Vault use a dev-mode container
+- The `env` adapter doubles as the test provider for consumer libraries
+
+**Adding new backends:**
+
+1. Add a new feature flag in `credential-provider/Cargo.toml`
+2. Implement `CredentialProvider<C>` for the new backend
+3. Gate the module behind `#[cfg(feature = "new-backend")]`
+4. Add error mapping from the backend SDK to `CredentialError`
+5. Document in the spec and update feature flag tables
 
 ## Examples
 
-**Provider-agnostic business logic:**
+**Consumer library — depends only on core:**
+
 ```rust
-// This code works identically with Azure, AWS, or InMemory providers
-impl StandardQueueClient {
-    pub async fn receive_and_process(&self) -> Result<(), QueueError> {
-        // Never knows which provider is being used
-        let message = self.provider.receive().await?;
-        // Process message...
-        self.provider.complete_message(&message.receipt).await?;
+use credential_provider_core::{CredentialProvider, UsernamePassword};
+use std::sync::Arc;
+
+pub struct QueueConnector {
+    credentials: Arc<dyn CredentialProvider<UsernamePassword>>,
+}
+
+impl QueueConnector {
+    pub async fn connect(&self) -> Result<(), Error> {
+        let creds = self.credentials.get().await?;
+        // Use creds.username and creds.password — never knows which backend
     }
 }
 ```
 
-**Runtime provider selection:**
+**Application — wires concrete providers at startup:**
+
 ```rust
-let config = ProviderConfig::AzureServiceBus(azure_config);
-// Factory returns Box<dyn QueueClient> without exposing provider type
-let client = QueueClientFactory::create(config).await?;
+use credential_provider::vault::VaultProvider;
+use credential_provider_core::CachingCredentialProvider;
+
+let raw = VaultProvider::dynamic_credentials(vault_client, "rabbitmq", "creds/queue-keeper");
+let provider = Arc::new(CachingCredentialProvider::new(raw, Duration::from_secs(60)));
+
+let connector = QueueConnector { credentials: provider };
 ```
 
 ## References
 
-- [Architecture Spec](../../docs/spec/architecture.md)
-- [Responsibilities Spec](../../docs/spec/responsibilities.md)
-- Hexagonal Architecture: https://alistair.cockburn.us/hexagonal-architecture/
+- [Architecture Spec](../spec/architecture.md)
+- [Responsibilities Spec](../spec/responsibilities.md)
+- [Overview: Design Goals](../spec/overview.md#design-goals)
+- Hexagonal Architecture: <https://alistair.cockburn.us/hexagonal-architecture/>
