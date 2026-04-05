@@ -11,7 +11,7 @@ Non-standard flows, failure modes, and recovery behavior that need explicit hand
 - **Scenario:** Application starts, cache is empty, first `get()` call fails because Vault is still starting up
 - **Behavior:** Returns `CredentialError::Unreachable` (no stale fallback because cache is empty)
 - **Consumer impact:** Application should retry with backoff at startup. This is expected during rolling deployments where the application may start before Vault is ready.
-- **See:** A-CACHE-5
+- **See:** A-CACHE-1 (empty cache triggers fetch), A-CACHE-5 (error propagation when cache is empty)
 
 ### E-CACHE-2: Credential expires exactly at refresh window boundary
 

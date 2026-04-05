@@ -129,12 +129,12 @@ Convenience constructors are provided for commonly used engine patterns. Adding 
 
 #### Dynamic credentials engines (RabbitMQ, database, etc.)
 
-Engines that generate credentials on demand with a lease duration. The returned credential carries `expires_at` derived from Vault's `lease_duration`.
+Engines that generate credentials on demand with a lease duration. The `dynamic_credentials` convenience constructor returns a `VaultProvider<UsernamePassword>` — the default credential type for engines that issue username/password pairs (RabbitMQ, database, etc.). The returned credential carries `expires_at` derived from Vault's `lease_duration`.
 
 ```rust
 use credential_provider::vault::VaultProvider;
 
-// RabbitMQ dynamic credentials
+// RabbitMQ dynamic credentials — returns VaultProvider<UsernamePassword>
 let provider = VaultProvider::dynamic_credentials(
     vault_client.clone(),
     "rabbitmq",             // mount path
@@ -263,8 +263,11 @@ The recommended approach for unit and integration tests that exercise code depen
 ```rust
 #[tokio::test]
 async fn test_queue_connection_uses_credentials() {
-    std::env::set_var("TEST_QUEUE_USER", "testuser");
-    std::env::set_var("TEST_QUEUE_PASS", "testpass");
+    // SAFETY: test is single-threaded; no concurrent env access.
+    unsafe {
+        std::env::set_var("TEST_QUEUE_USER", "testuser");
+        std::env::set_var("TEST_QUEUE_PASS", "testpass");
+    }
 
     let provider = EnvUsernamePasswordProvider::new("TEST_QUEUE_USER", "TEST_QUEUE_PASS");
     let caching = CachingCredentialProvider::new(provider, Duration::from_secs(60));
@@ -276,7 +279,7 @@ async fn test_queue_connection_uses_credentials() {
 
 ### Using a `MockCredentialProvider`
 
-For tests that need to control credential validity and expiry precisely, a `MockCredentialProvider` is provided in `credential-provider-core` under the `#[cfg(test)]` flag, and also available as a test utility in this crate behind the `test-support` feature:
+For tests that need to control credential validity and expiry precisely, `MockCredentialProvider` is defined in `credential-provider-core` (available under `#[cfg(test)]` for that crate's own tests) and re-exported by this crate behind the `test-support` feature for use by downstream consumers:
 
 ```rust
 use credential_provider::test_support::MockCredentialProvider;
@@ -284,7 +287,7 @@ use credential_provider::test_support::MockCredentialProvider;
 let provider = MockCredentialProvider::<UsernamePassword>::new()
     .returning(Ok(UsernamePassword {
         username: "mock".to_string(),
-        password: "secret".to_string().into(),
+        password: SecretString::new("secret".to_string()),
         expires_at: Some(Instant::now() + Duration::from_secs(300)),
     }));
 ```

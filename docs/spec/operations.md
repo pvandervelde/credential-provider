@@ -62,14 +62,14 @@ graph LR
 | Backend | Typical lease/token lifetime | Recommended `refresh_before_expiry` |
 |---|---|---|
 | Vault dynamic engines | 1 hour (default) | 60 seconds |
-| Vault KV v2 / static | No expiry | 300 seconds (re-read interval) |
+| Vault KV v2 / static | No expiry | N/A — cached indefinitely until restart |
 | Azure token | ~1 hour | 300 seconds |
 | AWS credentials | 1–12 hours | 300 seconds |
-| Env variables | No expiry | 300 seconds (re-read interval) |
+| Env variables | No expiry | N/A — cached indefinitely until restart |
 
-For static-secret providers (KV v2 and env) which return credentials with no expiry, the `refresh_before_expiry` value acts as a periodic re-read interval. Since credentials never expire, the cache never enters the refresh window automatically. The CachingCredentialProvider should treat no-expiry credentials as indefinitely valid — re-reading is only triggered if the application explicitly invalidates the cache (if such an API is provided) or restarts.
+For providers that return credentials with no expiry (KV v2 and env), `CachingCredentialProvider` caches the value indefinitely — it has no periodic polling or re-read mechanism. The `refresh_before_expiry` parameter only takes effect when `expires_at()` returns `Some(instant)`.
 
-**Clarification:** For no-expiry credentials, `CachingCredentialProvider` will cache them forever (until process restart). If external rotation is expected (e.g., KV v2 secret updated), the application must restart or implement an explicit invalidation mechanism outside this crate's scope.
+If external rotation of no-expiry secrets is expected (e.g., a KV v2 secret is updated in Vault), the application must restart or implement an explicit cache invalidation mechanism outside this crate's scope.
 
 ---
 

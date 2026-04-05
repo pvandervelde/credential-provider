@@ -116,7 +116,7 @@ aws   = ["dep:aws-config", "dep:aws-credential-types"]
 
 | Dependency | Version | Purpose |
 |---|---|---|
-| `secrecy` | 0.8 (with `serde` feature) | Secret memory management with zeroize-on-drop |
+| `secrecy` | 0.8 (with `serde` feature) | Secret memory management with zeroize-on-drop. The `serde` feature is enabled because `SecretString` and `SecretVec<u8>` require it for `Deserialize` support — this allows credential types to be constructed from deserialized configuration or backend responses without manual conversion. |
 | `thiserror` | 1 | Derive macro for error types |
 | `tokio` | 1 (features: `sync`, `time`) | RwLock, timing primitives |
 | `vaultrs` | 0.7 (optional, `rustls` feature) | Vault client |

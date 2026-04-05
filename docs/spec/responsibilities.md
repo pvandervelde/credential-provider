@@ -229,6 +229,8 @@ This document uses Responsibility-Driven Design (RDD) to define what each compon
 
 ### MockCredentialProvider (test support)
 
+**Defined in:** `credential-provider-core` (canonical location). Re-exported by `credential-provider` behind the `test-support` feature for convenience.
+
 **Responsibilities:**
 
 - Knows: A pre-configured return value or sequence of return values
