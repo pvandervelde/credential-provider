@@ -1,0 +1,32 @@
+[workspace]
+members = [
+    "credential-provider-core",
+    "credential-provider",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.91.1"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/pvandervelde/credential-provider"
+
+[workspace.dependencies]
+# Core dependencies (always present)
+secrecy   = { version = "0.8", features = ["serde"] }
+thiserror = "1"
+tokio     = { version = "1", features = ["sync", "time"] }
+
+# Vault backend — mark optional = true in member Cargo.toml
+vaultrs = { version = "0.7", default-features = false, features = ["rustls"] }
+
+# Azure backend — mark optional = true in member Cargo.toml
+azure_identity = { version = "0.19" }
+azure_core     = { version = "0.19" }
+
+# AWS backend — mark optional = true in member Cargo.toml
+aws-config           = { version = "1" }
+aws-credential-types = { version = "1" }
+
+# JSON parsing — used by vault feature; mark optional = true in member Cargo.toml
+serde_json = { version = "1" }

@@ -1,0 +1,46 @@
+[package]
+name = "credential-provider"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Backend adapters for credential-provider-core (env, Vault, Azure, AWS)"
+
+[dependencies]
+credential-provider-core = { path = "../credential-provider-core" }
+thiserror = { workspace = true }
+
+# vault feature
+vaultrs = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+# azure feature
+azure_identity = { workspace = true, optional = true }
+azure_core = { workspace = true, optional = true }
+
+# aws feature
+aws-config = { workspace = true, optional = true }
+aws-credential-types = { workspace = true, optional = true }
+
+[features]
+default = ["env"]
+
+# Environment variable provider — no external deps, always safe to include.
+env = []
+
+# HashiCorp Vault provider. Generic VaultProvider<C> supporting any secrets engine.
+vault = ["dep:vaultrs", "dep:serde_json", "dep:tokio"]
+
+# Azure credential provider. Wraps azure-identity for managed identity,
+# service principal, and workload identity flows.
+azure = ["dep:azure_identity", "dep:azure_core"]
+
+# AWS credential provider. Wraps aws-config for IAM role and environment
+# credential chain resolution.
+aws = ["dep:aws-config", "dep:aws-credential-types"]
+
+# Exposes MockCredentialProvider for use in downstream test code.
+# Must never be enabled in production builds.
+test-support = ["credential-provider-core/test-support"]
