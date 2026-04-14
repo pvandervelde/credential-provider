@@ -1,0 +1,18 @@
+[package]
+name        = "credential-provider-core"
+version     = "0.1.0"
+edition.workspace     = true
+rust-version.workspace = true
+license.workspace     = true
+repository.workspace  = true
+description = "Provider-agnostic credential management traits and types for Rust services"
+
+[dependencies]
+secrecy   = { workspace = true }
+thiserror = { workspace = true }
+tokio     = { workspace = true }
+
+[features]
+# Exposes MockCredentialProvider for use in downstream test code.
+# Must never be enabled in production builds.
+test-support = []
