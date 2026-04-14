@@ -13,7 +13,7 @@ thiserror = { workspace = true }
 
 # vault feature
 vaultrs = { workspace = true, optional = true }
-serde_json = { version = "1", optional = true }
+serde_json = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 # azure feature

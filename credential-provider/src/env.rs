@@ -1,7 +1,7 @@
 // SPEC: docs/spec/interfaces/env-adapters.md
 #![allow(dead_code)]
 
-use credential_provider_core::{BearerToken, CredentialError, CredentialProvider, HmacSecret, UsernamePassword};
+use credential_provider_core::{BearerToken, BoxFuture, CredentialError, CredentialProvider, HmacSecret, UsernamePassword};
 
 // ---------------------------------------------------------------------------
 // EnvUsernamePasswordProvider
@@ -48,8 +48,8 @@ impl EnvUsernamePasswordProvider {
 }
 
 impl CredentialProvider<UsernamePassword> for EnvUsernamePasswordProvider {
-    async fn get(&self) -> Result<UsernamePassword, CredentialError> {
-        unimplemented!("See docs/spec/interfaces/env-adapters.md")
+    fn get(&self) -> BoxFuture<'_, Result<UsernamePassword, CredentialError>> {
+        Box::pin(async move { unimplemented!("See docs/spec/interfaces/env-adapters.md") })
     }
 }
 
@@ -93,8 +93,8 @@ impl EnvHmacSecretProvider {
 }
 
 impl CredentialProvider<HmacSecret> for EnvHmacSecretProvider {
-    async fn get(&self) -> Result<HmacSecret, CredentialError> {
-        unimplemented!("See docs/spec/interfaces/env-adapters.md")
+    fn get(&self) -> BoxFuture<'_, Result<HmacSecret, CredentialError>> {
+        Box::pin(async move { unimplemented!("See docs/spec/interfaces/env-adapters.md") })
     }
 }
 
@@ -137,7 +137,7 @@ impl EnvBearerTokenProvider {
 }
 
 impl CredentialProvider<BearerToken> for EnvBearerTokenProvider {
-    async fn get(&self) -> Result<BearerToken, CredentialError> {
-        unimplemented!("See docs/spec/interfaces/env-adapters.md")
+    fn get(&self) -> BoxFuture<'_, Result<BearerToken, CredentialError>> {
+        Box::pin(async move { unimplemented!("See docs/spec/interfaces/env-adapters.md") })
     }
 }

@@ -13,6 +13,7 @@
 /// should include a wildcard arm for forward compatibility.
 ///
 /// See: docs/spec/interfaces/shared-types.md
+#[non_exhaustive]
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum CredentialError {
     /// The backing store returned an error response (HTTP 500, malformed

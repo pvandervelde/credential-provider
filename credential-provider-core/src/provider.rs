@@ -1,6 +1,15 @@
 // SPEC: docs/spec/interfaces/shared-types.md — CredentialProvider
 
+use std::pin::Pin;
+
 use crate::{Credential, CredentialError};
+
+/// Type alias for a boxed, pinned async future used in trait method signatures.
+///
+/// Using `BoxFuture` instead of `impl Future` in the [`CredentialProvider`] trait
+/// makes the trait object-safe, allowing `Arc<dyn CredentialProvider<C>>` to
+/// be used at runtime without size-at-compile-time constraints.
+pub type BoxFuture<'a, T> = Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
 
 /// The central abstraction for credential management.
 ///
@@ -59,5 +68,5 @@ pub trait CredentialProvider<C: Credential>: Send + Sync + 'static {
     /// - [`CredentialError::Unreachable`] — store could not be contacted
     /// - [`CredentialError::Configuration`] — provider is misconfigured
     /// - [`CredentialError::Revoked`] — credential was explicitly revoked
-    fn get(&self) -> impl std::future::Future<Output = Result<C, CredentialError>> + Send;
+    fn get(&self) -> BoxFuture<'_, Result<C, CredentialError>>;
 }

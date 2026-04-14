@@ -27,3 +27,6 @@ azure_core     = { version = "0.19" }
 # AWS backend — mark optional = true in member Cargo.toml
 aws-config           = { version = "1" }
 aws-credential-types = { version = "1" }
+
+# JSON parsing — used by vault feature; mark optional = true in member Cargo.toml
+serde_json = { version = "1" }

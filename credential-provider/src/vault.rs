@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use credential_provider_core::{
-    BearerToken, Credential, CredentialError, CredentialProvider, HmacSecret,
+    BearerToken, BoxFuture, Credential, CredentialError, CredentialProvider, HmacSecret,
     TlsClientCertificate, UsernamePassword,
 };
 use vaultrs::client::VaultClient;
@@ -255,7 +255,7 @@ impl VaultProvider<TlsClientCertificate> {
 }
 
 impl<C: Credential> CredentialProvider<C> for VaultProvider<C> {
-    async fn get(&self) -> Result<C, CredentialError> {
-        unimplemented!("See docs/spec/interfaces/vault-adapter.md")
+    fn get(&self) -> BoxFuture<'_, Result<C, CredentialError>> {
+        Box::pin(async move { unimplemented!("See docs/spec/interfaces/vault-adapter.md") })
     }
 }

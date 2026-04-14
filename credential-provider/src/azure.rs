@@ -4,9 +4,7 @@
 #![allow(dead_code, unused_variables)]
 
 use azure_identity::DefaultAzureCredential;
-#[allow(unused_imports)]
-use azure_core::auth::TokenCredential;
-use credential_provider_core::{BearerToken, CredentialError, CredentialProvider};
+use credential_provider_core::{BearerToken, BoxFuture, CredentialError, CredentialProvider};
 
 /// A [`CredentialProvider<BearerToken>`] that delegates to the Azure Identity
 /// credential chain.
@@ -81,7 +79,7 @@ impl AzureCredentialProvider {
 }
 
 impl CredentialProvider<BearerToken> for AzureCredentialProvider {
-    async fn get(&self) -> Result<BearerToken, CredentialError> {
-        unimplemented!("See docs/spec/interfaces/azure-adapter.md")
+    fn get(&self) -> BoxFuture<'_, Result<BearerToken, CredentialError>> {
+        Box::pin(async move { unimplemented!("See docs/spec/interfaces/azure-adapter.md") })
     }
 }

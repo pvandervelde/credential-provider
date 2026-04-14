@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use crate::{Credential, CredentialError, CredentialProvider};
+use crate::{BoxFuture, Credential, CredentialError, CredentialProvider};
 
 /// A test double for [`CredentialProvider<C>`] that returns pre-configured
 /// values.
@@ -46,7 +46,7 @@ use crate::{Credential, CredentialError, CredentialProvider};
 ///
 /// See: docs/spec/interfaces/test-support.md
 #[cfg(any(test, feature = "test-support"))]
-pub struct MockCredentialProvider<C: Credential + Clone> {
+pub struct MockCredentialProvider<C: Credential> {
     /// The values returned in sequence on each call to `get()`. When the
     /// sequence is exhausted, subsequent calls return a clone of the last
     /// value.
@@ -59,7 +59,7 @@ pub struct MockCredentialProvider<C: Credential + Clone> {
 }
 
 #[cfg(any(test, feature = "test-support"))]
-impl<C: Credential + Clone> MockCredentialProvider<C> {
+impl<C: Credential> MockCredentialProvider<C> {
     /// Creates a mock that always returns the given credential.
     pub fn returning_ok(credential: C) -> Self {
         Self {
@@ -98,15 +98,17 @@ impl<C: Credential + Clone> MockCredentialProvider<C> {
 }
 
 #[cfg(any(test, feature = "test-support"))]
-impl<C: Credential + Clone> CredentialProvider<C> for MockCredentialProvider<C> {
-    async fn get(&self) -> Result<C, CredentialError> {
-        self.call_count.fetch_add(1, Ordering::SeqCst);
-        let mut guard = self.responses.lock().await;
-        if guard.len() > 1 {
-            guard.remove(0)
-        } else {
-            // Clone the last element so we can repeat it indefinitely.
-            guard[0].clone()
-        }
+impl<C: Credential> CredentialProvider<C> for MockCredentialProvider<C> {
+    fn get(&self) -> BoxFuture<'_, Result<C, CredentialError>> {
+        Box::pin(async move {
+            self.call_count.fetch_add(1, Ordering::SeqCst);
+            let mut guard = self.responses.lock().await;
+            if guard.len() > 1 {
+                guard.remove(0)
+            } else {
+                // Clone the last element so we can repeat it indefinitely.
+                guard[0].clone()
+            }
+        })
     }
 }

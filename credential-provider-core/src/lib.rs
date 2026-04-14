@@ -19,7 +19,7 @@ pub mod mock;
 pub use caching::CachingCredentialProvider;
 pub use credentials::{BearerToken, HmacSecret, TlsClientCertificate, UsernamePassword};
 pub use error::CredentialError;
-pub use provider::CredentialProvider;
+pub use provider::{BoxFuture, CredentialProvider};
 
 // Re-export secrecy primitives so consumers of this crate do not need a
 // direct dependency on `secrecy`.

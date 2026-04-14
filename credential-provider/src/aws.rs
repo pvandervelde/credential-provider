@@ -5,7 +5,7 @@
 
 use std::time::Instant;
 
-use credential_provider_core::{Credential, CredentialError, CredentialProvider};
+use credential_provider_core::{BoxFuture, Credential, CredentialError, CredentialProvider};
 
 // ---------------------------------------------------------------------------
 // AwsCredentials
@@ -114,7 +114,7 @@ impl AwsCredentialProvider {
 }
 
 impl CredentialProvider<AwsCredentials> for AwsCredentialProvider {
-    async fn get(&self) -> Result<AwsCredentials, CredentialError> {
-        unimplemented!("See docs/spec/interfaces/aws-adapter.md")
+    fn get(&self) -> BoxFuture<'_, Result<AwsCredentials, CredentialError>> {
+        Box::pin(async move { unimplemented!("See docs/spec/interfaces/aws-adapter.md") })
     }
 }

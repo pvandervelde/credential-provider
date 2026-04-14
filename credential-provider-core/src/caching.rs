@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use tokio::sync::{Mutex, RwLock};
 
-use crate::{Credential, CredentialError, CredentialProvider};
+use crate::{BoxFuture, Credential, CredentialError, CredentialProvider};
 
 /// A caching wrapper around any [`CredentialProvider<C>`].
 ///
@@ -29,7 +29,7 @@ use crate::{Credential, CredentialError, CredentialProvider};
 ///    Fetch fresh credentials.
 ///    - On success: cache the new credential and return it.
 ///    - On failure: return the still-valid stale cached credential (stale
-///      fallback). See [`ADR-003`].
+///      fallback). See ADR-003 (`docs/adr/ADR-003-stale-fallback-on-refresh-failure.md`).
 /// 4. **Expired cache** — the cached credential has `is_valid() == false`.
 ///    Fetch fresh credentials.
 ///    - On success: cache the new credential and return it.
@@ -58,8 +58,6 @@ use crate::{Credential, CredentialError, CredentialProvider};
 /// ```
 ///
 /// See: docs/spec/interfaces/caching.md
-///
-/// [`ADR-003`]: docs/adr/ADR-003-stale-fallback-on-refresh-failure.md
 pub struct CachingCredentialProvider<C, P>
 where
     C: Credential,
@@ -112,6 +110,13 @@ where
         }
     }
 
+}
+
+impl<C, P> CredentialProvider<C> for CachingCredentialProvider<C, P>
+where
+    C: Credential,
+    P: CredentialProvider<C>,
+{
     /// Returns cached credentials if still valid and outside the refresh
     /// window; otherwise fetches fresh credentials from the inner provider
     /// and updates the cache.
@@ -123,7 +128,7 @@ where
     /// Returns [`CredentialError::Unavailable`] when the cache is empty and
     /// the inner provider fetch fails, or propagates the inner provider error
     /// when the cached credential has expired and the fetch fails.
-    pub async fn get(&self) -> Result<C, CredentialError> {
-        unimplemented!("See docs/spec/interfaces/caching.md")
+    fn get(&self) -> BoxFuture<'_, Result<C, CredentialError>> {
+        Box::pin(async move { unimplemented!("See docs/spec/interfaces/caching.md") })
     }
 }
