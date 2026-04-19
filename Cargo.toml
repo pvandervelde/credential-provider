@@ -30,3 +30,6 @@ aws-credential-types = { version = "1" }
 
 # JSON parsing — used by vault feature; mark optional = true in member Cargo.toml
 serde_json = { version = "1" }
+
+# Structured logging
+tracing = "0.1"
