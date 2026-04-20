@@ -145,35 +145,33 @@ where
     /// when the cached credential has expired and the fetch fails.
     fn get(&self) -> BoxFuture<'_, Result<C, CredentialError>> {
         Box::pin(async move {
-            // Step 1: snapshot the cache without holding the guard across an await.
-            let cached_snapshot = {
+            // Rule 2 / Rule 6 — hot path: read under short-lived guard.
+            // Drop the guard before any await. Only two copies of secret
+            // fields exist: the cached original and the return value.
+            {
                 let read_guard = self.cached.read().await;
-                read_guard.clone()
-            };
-
-            // Rule 2 / Rule 6 — hot path: valid credential outside refresh window.
-            // No locking needed; just return the cached value immediately.
-            if let Some(ref c) = cached_snapshot {
-                if c.is_valid()
-                    && !is_inside_refresh_window(c.expires_at(), self.refresh_before_expiry)
-                {
-                    return Ok(c.clone());
+                if let Some(c) = &*read_guard {
+                    if c.is_valid()
+                        && !is_inside_refresh_window(c.expires_at(), self.refresh_before_expiry)
+                    {
+                        return Ok(c.clone());
+                    }
                 }
-            }
+            } // read_guard dropped here — no secret copies in flight during lock acquisition
 
-            // Rules 1, 3, 4, 5 all require a fetch.  Serialize concurrent fetches
-            // so only one task calls the inner provider at a time.
+            // Rules 1, 3, 4, 5: serialize concurrent fetches.
             let _refresh_guard = self.refresh_lock.lock().await;
 
-            // Re-read the cache: another task may have refreshed while we waited.
-            let recheck = {
+            // Post-lock snapshot: serves as both the thundering-herd recheck
+            // and the stale-fallback candidate. Derived after acquiring the lock
+            // so it reflects the most recent cache state (fixes FINDING-005).
+            let post_lock_snapshot: Option<C> = {
                 let read_guard = self.cached.read().await;
                 read_guard.clone()
             };
 
-            // If the re-check is now valid and outside the refresh window, return it
-            // (covers the thundering-herd case for all rules).
-            if let Some(ref c) = recheck {
+            // Thundering-herd guard: another task may have refreshed while we waited.
+            if let Some(c) = &post_lock_snapshot {
                 if c.is_valid()
                     && !is_inside_refresh_window(c.expires_at(), self.refresh_before_expiry)
                 {
@@ -181,12 +179,12 @@ where
                 }
             }
 
-            // Classify the original snapshot to choose the right error-handling path
-            // after a failed fetch.
-            let cache_was_empty = cached_snapshot.is_none();
-            let cached_was_valid = cached_snapshot.as_ref().map_or(false, |c| c.is_valid());
+            // Classify for post-fetch error handling using the post-lock state.
+            let cache_was_empty = post_lock_snapshot.is_none();
+            let cached_was_valid =
+                post_lock_snapshot.as_ref().map_or(false, Credential::is_valid);
 
-            // Fetch fresh credentials from the inner provider.
+            // Fetch from the inner provider.
             match self.inner.get().await {
                 Ok(new_cred) => {
                     {
@@ -201,8 +199,8 @@ where
                         Err(CredentialError::Unavailable)
                     } else if cached_was_valid {
                         // Rule 3/4: was valid (inside window) + failed fetch.
-                        // Re-check validity RIGHT NOW — time passed during the fetch.
-                        let stale = cached_snapshot.unwrap();
+                        // Re-check validity RIGHT NOW — time has passed during the fetch.
+                        let stale = post_lock_snapshot.unwrap();
                         if stale.is_valid() {
                             warn!(
                                 error = %e,
@@ -210,7 +208,7 @@ where
                             );
                             Ok(stale)
                         } else {
-                            // Expired during the fetch; fall through to Rule 5 behaviour.
+                            // Expired during the fetch; fall through to Rule 5.
                             Err(e)
                         }
                     } else {
