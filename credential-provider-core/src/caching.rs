@@ -1,11 +1,26 @@
 // SPEC: docs/spec/interfaces/caching.md
-#![allow(dead_code)]
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::sync::{Mutex, RwLock};
+use tracing::warn;
 
 use crate::{BoxFuture, Credential, CredentialError, CredentialProvider};
+
+/// Returns `true` when the credential will expire within `refresh_before_expiry`.
+///
+/// A credential with no expiry (`None`) is never inside the refresh window.
+/// The comparison uses `<=` so that the at-boundary case is treated as inside
+/// the window (see E-CACHE-2).
+fn is_inside_refresh_window(expires_at: Option<Instant>, refresh_before_expiry: Duration) -> bool {
+    match expires_at {
+        None => false,
+        Some(exp) => {
+            let remaining = exp.saturating_duration_since(Instant::now());
+            remaining <= refresh_before_expiry
+        }
+    }
+}
 
 /// A caching wrapper around any [`CredentialProvider<C>`].
 ///
@@ -129,7 +144,81 @@ where
     /// the inner provider fetch fails, or propagates the inner provider error
     /// when the cached credential has expired and the fetch fails.
     fn get(&self) -> BoxFuture<'_, Result<C, CredentialError>> {
-        Box::pin(async move { unimplemented!("See docs/spec/interfaces/caching.md") })
+        Box::pin(async move {
+            // Step 1: snapshot the cache without holding the guard across an await.
+            let cached_snapshot = {
+                let read_guard = self.cached.read().await;
+                read_guard.clone()
+            };
+
+            // Rule 2 / Rule 6 — hot path: valid credential outside refresh window.
+            // No locking needed; just return the cached value immediately.
+            if let Some(ref c) = cached_snapshot {
+                if c.is_valid()
+                    && !is_inside_refresh_window(c.expires_at(), self.refresh_before_expiry)
+                {
+                    return Ok(c.clone());
+                }
+            }
+
+            // Rules 1, 3, 4, 5 all require a fetch.  Serialize concurrent fetches
+            // so only one task calls the inner provider at a time.
+            let _refresh_guard = self.refresh_lock.lock().await;
+
+            // Re-read the cache: another task may have refreshed while we waited.
+            let recheck = {
+                let read_guard = self.cached.read().await;
+                read_guard.clone()
+            };
+
+            // If the re-check is now valid and outside the refresh window, return it
+            // (covers the thundering-herd case for all rules).
+            if let Some(ref c) = recheck {
+                if c.is_valid()
+                    && !is_inside_refresh_window(c.expires_at(), self.refresh_before_expiry)
+                {
+                    return Ok(c.clone());
+                }
+            }
+
+            // Classify the original snapshot to choose the right error-handling path
+            // after a failed fetch.
+            let cache_was_empty = cached_snapshot.is_none();
+            let cached_was_valid = cached_snapshot.as_ref().map_or(false, |c| c.is_valid());
+
+            // Fetch fresh credentials from the inner provider.
+            match self.inner.get().await {
+                Ok(new_cred) => {
+                    {
+                        let mut write_guard = self.cached.write().await;
+                        *write_guard = Some(new_cred.clone());
+                    }
+                    Ok(new_cred)
+                }
+                Err(e) => {
+                    if cache_was_empty {
+                        // Rule 1: empty cache + failed fetch → always Unavailable.
+                        Err(CredentialError::Unavailable)
+                    } else if cached_was_valid {
+                        // Rule 3/4: was valid (inside window) + failed fetch.
+                        // Re-check validity RIGHT NOW — time passed during the fetch.
+                        let stale = cached_snapshot.unwrap();
+                        if stale.is_valid() {
+                            warn!(
+                                "stale credential fallback: refresh failed while cache is still valid"
+                            );
+                            Ok(stale)
+                        } else {
+                            // Expired during the fetch; fall through to Rule 5 behaviour.
+                            Err(e)
+                        }
+                    } else {
+                        // Rule 5: expired + failed fetch → propagate the actual error.
+                        Err(e)
+                    }
+                }
+            }
+        })
     }
 }
 
