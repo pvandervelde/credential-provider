@@ -117,6 +117,10 @@ where
     /// The cache starts empty. The first call to `get()` will always perform
     /// a live fetch.
     pub fn new(inner: P, refresh_before_expiry: Duration) -> Self {
+        debug_assert!(
+            !refresh_before_expiry.is_zero(),
+            "refresh_before_expiry must be a positive Duration"
+        );
         Self {
             inner,
             cached: RwLock::new(None),
@@ -164,7 +168,7 @@ where
 
             // Post-lock snapshot: serves as both the thundering-herd recheck
             // and the stale-fallback candidate. Derived after acquiring the lock
-            // so it reflects the most recent cache state (fixes FINDING-005).
+            // so it reflects the most recent cache state.
             let post_lock_snapshot: Option<C> = {
                 let read_guard = self.cached.read().await;
                 read_guard.clone()
