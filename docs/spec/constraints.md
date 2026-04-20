@@ -119,11 +119,13 @@ aws   = ["dep:aws-config", "dep:aws-credential-types"]
 | `secrecy` | 0.8 (with `serde` feature) | Secret memory management with zeroize-on-drop. The `serde` feature is enabled because `SecretString` and `SecretVec<u8>` require it for `Deserialize` support — this allows credential types to be constructed from deserialized configuration or backend responses without manual conversion. |
 | `thiserror` | 1 | Derive macro for error types |
 | `tokio` | 1 (features: `sync`, `time`) | RwLock, timing primitives |
-| `vaultrs` | 0.7 (optional, `rustls` feature) | Vault client |
+| `vaultrs` | 0.8 (optional, `rustls` feature) | Vault client |
 | `azure-identity` | 0.19 (optional) | Azure credential chain |
 | `azure-core` | 0.19 (optional) | Azure core types |
 | `aws-config` | 1 (optional) | AWS credential chain |
 | `aws-credential-types` | 1 (optional) | AWS credential types |
+| `tracing` | 0.1 | Observability facade for structured logging (see ADR-005) |
+| `metrics` | 0.24 | Observability facade for counters and gauges (see ADR-005) |
 
 ### Forbidden Dependencies in Core
 
@@ -132,4 +134,4 @@ The following must never appear in `credential-provider-core`:
 - Any secrets backend SDK
 - Any HTTP client
 - Any serialization library beyond what `secrecy` requires
-- Any logging/tracing framework (consumers choose their own)
+- Concrete logging/tracing or metrics implementations (e.g., `tracing-subscriber`, `env_logger`, `prometheus`); use zero-implementation facade crates (`tracing`, `metrics`) instead — see ADR-005
