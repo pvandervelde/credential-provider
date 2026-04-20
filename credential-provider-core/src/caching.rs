@@ -205,6 +205,7 @@ where
                         let stale = cached_snapshot.unwrap();
                         if stale.is_valid() {
                             warn!(
+                                error = %e,
                                 "stale credential fallback: refresh failed while cache is still valid"
                             );
                             Ok(stale)
