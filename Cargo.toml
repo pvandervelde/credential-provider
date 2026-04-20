@@ -33,3 +33,6 @@ serde_json = { version = "1" }
 
 # Structured logging
 tracing = "0.1"
+
+# Metrics facade
+metrics = "0.24"

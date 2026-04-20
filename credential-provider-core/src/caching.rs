@@ -3,6 +3,7 @@
 use std::time::{Duration, Instant};
 
 use tokio::sync::{Mutex, RwLock};
+use metrics::counter;
 use tracing::warn;
 
 use crate::{BoxFuture, Credential, CredentialError, CredentialProvider};
@@ -210,6 +211,7 @@ where
                                 error = %e,
                                 "stale credential fallback: refresh failed while cache is still valid"
                             );
+                            counter!("credential_cache_stale_fallbacks_total").increment(1);
                             Ok(stale)
                         } else {
                             // Expired during the fetch; fall through to Rule 5.
