@@ -54,7 +54,7 @@ const REFRESH_WINDOW: Duration = Duration::from_secs(60);
 //   • the result is cached (second call does NOT call inner again)
 
 #[tokio::test]
-async fn empty_cache_calls_inner_and_returns_result() {
+async fn test_empty_cache_calls_inner_and_returns_result() {
     let mock = MockCredentialProvider::returning_ok(valid_up("alice"));
     let caching = CachingCredentialProvider::new(mock, REFRESH_WINDOW);
 
@@ -67,7 +67,7 @@ async fn empty_cache_calls_inner_and_returns_result() {
 /// Stub-killer: if the result is not cached, the second call would hit the
 /// `Err` response and fail.
 #[tokio::test]
-async fn empty_cache_result_is_cached_second_call_does_not_refetch() {
+async fn test_empty_cache_result_is_cached_second_call_does_not_refetch() {
     let mock = MockCredentialProvider::from_sequence(vec![
         Ok(valid_up("alice")),
         Err(CredentialError::Backend(
@@ -91,7 +91,7 @@ async fn empty_cache_result_is_cached_second_call_does_not_refetch() {
 ///
 /// Covers E-CACHE-1 as well.
 #[tokio::test]
-async fn empty_cache_inner_failure_returns_unavailable() {
+async fn test_empty_cache_inner_failure_returns_unavailable() {
     let mock = MockCredentialProvider::<UsernamePassword>::returning_err(CredentialError::Backend(
         "vault unreachable".into(),
     ));
@@ -113,7 +113,7 @@ async fn empty_cache_inner_failure_returns_unavailable() {
 
 /// If inner is called a second time it returns `Err` — proves it must not be.
 #[tokio::test]
-async fn valid_credential_outside_refresh_window_not_fetched_again() {
+async fn test_valid_credential_outside_refresh_window_not_fetched_again() {
     let mock = MockCredentialProvider::from_sequence(vec![
         Ok(valid_up("alice")),
         Err(CredentialError::Backend(
@@ -132,7 +132,7 @@ async fn valid_credential_outside_refresh_window_not_fetched_again() {
 }
 
 #[tokio::test]
-async fn valid_credential_outside_refresh_window_returns_cached_value() {
+async fn test_valid_credential_outside_refresh_window_returns_cached_value() {
     let mock = MockCredentialProvider::returning_ok(valid_up("cached-user"));
     let caching = CachingCredentialProvider::new(mock, REFRESH_WINDOW);
 
@@ -148,7 +148,7 @@ async fn valid_credential_outside_refresh_window_returns_cached_value() {
 //   • the NEW credential is returned (not the old one)
 
 #[tokio::test]
-async fn credential_inside_refresh_window_triggers_refresh_and_returns_new() {
+async fn test_credential_inside_refresh_window_triggers_refresh_and_returns_new() {
     // 30 s remaining < 60 s window → inside window → refresh triggered
     let mock = MockCredentialProvider::from_sequence(vec![
         Ok(refreshing_up("old-user")),
@@ -169,7 +169,7 @@ async fn credential_inside_refresh_window_triggers_refresh_and_returns_new() {
 /// Stub-killer: verifies that the old cached value is NOT returned when
 /// inner succeeds during a refresh.
 #[tokio::test]
-async fn credential_inside_refresh_window_does_not_return_old_value_on_success() {
+async fn test_credential_inside_refresh_window_does_not_return_old_value_on_success() {
     let mock = MockCredentialProvider::from_sequence(vec![
         Ok(refreshing_up("old-user")),
         Ok(valid_up("new-user")),
@@ -190,7 +190,7 @@ async fn credential_inside_refresh_window_does_not_return_old_value_on_success()
 //   • stale cached credential is returned (not the error)
 
 #[tokio::test]
-async fn credential_inside_refresh_window_refresh_failure_returns_stale_not_error() {
+async fn test_credential_inside_refresh_window_refresh_failure_returns_stale_not_error() {
     let mock = MockCredentialProvider::from_sequence(vec![
         Ok(refreshing_up("stale-user")),
         Err(CredentialError::Unreachable("backend down".into())),
@@ -208,7 +208,7 @@ async fn credential_inside_refresh_window_refresh_failure_returns_stale_not_erro
 }
 
 #[tokio::test]
-async fn stale_fallback_returns_specifically_the_still_valid_cached_username() {
+async fn test_stale_fallback_returns_specifically_the_still_valid_cached_username() {
     let mock = MockCredentialProvider::from_sequence(vec![
         Ok(refreshing_up("stale-user")),
         Err(CredentialError::Backend("refresh failed".into())),
@@ -232,7 +232,7 @@ async fn stale_fallback_returns_specifically_the_still_valid_cached_username() {
 /// The cache is populated with a pre-expired credential. The second call
 /// hits Rule 5 (expired cache) and must propagate the error, not fall back.
 #[tokio::test]
-async fn expired_credential_refresh_failure_propagates_error_not_stale() {
+async fn test_expired_credential_refresh_failure_propagates_error_not_stale() {
     let mock = MockCredentialProvider::from_sequence(vec![
         Ok(expired_up("expired-user")),
         Err(CredentialError::Backend("refresh failed".into())),
@@ -251,7 +251,8 @@ async fn expired_credential_refresh_failure_propagates_error_not_stale() {
 /// Stub-killer pair with `empty_cache_inner_failure_returns_unavailable`:
 /// Rule 5 must propagate the inner error, NOT wrap it in `Unavailable`.
 #[tokio::test]
-async fn expired_credential_refresh_failure_propagates_original_error_variant_not_unavailable() {
+async fn test_expired_credential_refresh_failure_propagates_original_error_variant_not_unavailable()
+{
     let mock = MockCredentialProvider::from_sequence(vec![
         Ok(expired_up("expired-user")),
         Err(CredentialError::Backend("specific backend error".into())),
@@ -274,7 +275,7 @@ async fn expired_credential_refresh_failure_propagates_original_error_variant_no
 // "fetched-once". Any duplicate fetch → at least one task sees "fetched-again".
 
 #[tokio::test]
-async fn concurrent_calls_on_empty_cache_serialize_to_one_fetch() {
+async fn test_concurrent_calls_on_empty_cache_serialize_to_one_fetch() {
     const N: usize = 8;
 
     let mock = MockCredentialProvider::from_sequence(vec![
@@ -323,7 +324,7 @@ async fn concurrent_calls_on_empty_cache_serialize_to_one_fetch() {
 /// If inner is called more than once it returns `Err` on the second call,
 /// causing any of the 6 loop iterations to fail.
 #[tokio::test]
-async fn no_expiry_credential_inner_called_only_once_across_many_calls() {
+async fn test_no_expiry_credential_inner_called_only_once_across_many_calls() {
     let mock = MockCredentialProvider::from_sequence(vec![
         Ok(HmacSecret::new(SecretVec::new(vec![1u8, 2, 3, 4]))),
         Err(CredentialError::Backend(
@@ -344,7 +345,7 @@ async fn no_expiry_credential_inner_called_only_once_across_many_calls() {
 }
 
 #[tokio::test]
-async fn no_expiry_credential_returns_same_bytes_on_every_call() {
+async fn test_no_expiry_credential_returns_same_bytes_on_every_call() {
     let key_bytes = vec![0xDE, 0xAD, 0xBE, 0xEF];
     let mock =
         MockCredentialProvider::returning_ok(HmacSecret::new(SecretVec::new(key_bytes.clone())));
@@ -366,7 +367,7 @@ async fn no_expiry_credential_returns_same_bytes_on_every_call() {
 //     returns the new credential
 
 #[tokio::test]
-async fn successful_refresh_returns_new_credential_not_old() {
+async fn test_successful_refresh_returns_new_credential_not_old() {
     let mock = MockCredentialProvider::from_sequence(vec![
         Ok(refreshing_up("old-user")),
         Ok(valid_up("new-user")),
@@ -383,7 +384,7 @@ async fn successful_refresh_returns_new_credential_not_old() {
 /// cache. The third call must return the new credential from cache without
 /// hitting inner again (inner would return `Err` on the third call).
 #[tokio::test]
-async fn after_successful_refresh_subsequent_call_returns_new_credential() {
+async fn test_after_successful_refresh_subsequent_call_returns_new_credential() {
     let mock = MockCredentialProvider::from_sequence(vec![
         Ok(refreshing_up("old-user")),
         Ok(valid_up("new-user")), // new-user has 3600 s validity → outside window on 3rd call
@@ -414,7 +415,7 @@ async fn after_successful_refresh_subsequent_call_returns_new_credential() {
 // <) so that the at-boundary case is always treated as inside the window.
 
 #[tokio::test]
-async fn credential_at_boundary_of_refresh_window_triggers_refresh() {
+async fn test_credential_at_boundary_of_refresh_window_triggers_refresh() {
     // expires_at ≈ now + 60 s; by the time get() checks it, remaining ≤ 60 s
     let boundary_cred = up("boundary-user", Some(Instant::now() + REFRESH_WINDOW));
     let mock = MockCredentialProvider::from_sequence(vec![

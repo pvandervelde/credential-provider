@@ -5,6 +5,9 @@
 [advisories]
 # Fetch the advisory database on check
 db-fetch = true
+# Newly unmaintained crates are a warning, not a hard failure. Individual
+# unmaintained advisories that have been reviewed are listed in ignore below.
+unmaintained = "warn"
 # Ignore advisories that have been reviewed and accepted below
 ignore = [
     # RUSTSEC-2026-0097: rand unsound with custom logger

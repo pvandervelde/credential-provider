@@ -118,7 +118,7 @@ where
     /// The cache starts empty. The first call to `get()` will always perform
     /// a live fetch.
     pub fn new(inner: P, refresh_before_expiry: Duration) -> Self {
-        debug_assert!(
+        assert!(
             !refresh_before_expiry.is_zero(),
             "refresh_before_expiry must be a positive Duration"
         );
@@ -204,11 +204,19 @@ where
                         Err(CredentialError::Unavailable)
                     } else if cached_was_valid {
                         // Rule 3/4: was valid (inside window) + failed fetch.
+                        // `cached_was_valid` being true here implies the credential was also
+                        // inside the refresh window — the thundering-herd guard (above) already
+                        // returned early for the valid+outside-window case. So this is
+                        // Rule 3/4 territory.
                         // Re-check validity RIGHT NOW — time has passed during the fetch.
                         let stale = post_lock_snapshot.unwrap();
                         if stale.is_valid() {
+                            let remaining_validity_secs = stale
+                                .expires_at()
+                                .map(|e| e.saturating_duration_since(Instant::now()).as_secs());
                             warn!(
                                 error = %e,
+                                remaining_validity_secs = remaining_validity_secs,
                                 "stale credential fallback: refresh failed while cache is still valid"
                             );
                             counter!("credential_cache_stale_fallbacks_total").increment(1);
