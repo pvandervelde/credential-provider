@@ -8,6 +8,16 @@ use credential_provider_core::{
 };
 use libfuzzer_sys::fuzz_target;
 
+/// Reuse a single tokio runtime across all fuzzer iterations on this thread.
+/// Constructing a Runtime per iteration allocates OS threads and performs
+/// syscalls, reducing throughput 10–100×. thread_local! ensures the Runtime
+/// is initialised once per thread for the lifetime of the fuzzer process.
+thread_local! {
+    static RT: tokio::runtime::Runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .expect("tokio rt must build");
+}
+
 /// Fuzz the `CachingCredentialProvider::get()` state machine.
 ///
 /// Input layout (10+ bytes):
@@ -83,12 +93,6 @@ fuzz_target!(|data: &[u8]| {
 
     let mock = MockCredentialProvider::from_sequence(responses);
     let provider = CachingCredentialProvider::new(mock, refresh_window);
-
-    thread_local! {
-        static RT: tokio::runtime::Runtime = tokio::runtime::Builder::new_current_thread()
-            .build()
-            .expect("tokio rt must build");
-    }
 
     // ── First call: cache is always empty ────────────────────────────────────
 

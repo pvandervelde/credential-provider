@@ -34,7 +34,11 @@ jobs:
                     TARGETS=""
                     echo "No fuzz directory found — add targets under fuzz/fuzz_targets/ to enable fuzzing"
                   fi
-                  echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
+                  {
+                    echo "targets<<EOF"
+                    echo "$TARGETS"
+                    echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
 
             - name: Run fuzz targets
               if: steps.list-targets.outputs.targets != ''
@@ -42,7 +46,7 @@ jobs:
                   DURATION="${{ github.event.inputs.duration || 300 }}"
                   while IFS= read -r target; do
                     [ -z "$target" ] && continue
-                    cd fuzz && cargo fuzz run "$target" -- -max_total_time="$DURATION" && cd ..
+                    (cd fuzz && cargo fuzz run "$target" -- -max_total_time="$DURATION")
                   done <<< "${{ steps.list-targets.outputs.targets }}"
 
             - name: Upload fuzz artifacts
