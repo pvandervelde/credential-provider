@@ -51,3 +51,4 @@ Maps behavioral assertions to test cases. Updated when new test suites are added
 - **E-CACHE-3 (lease shorter than window)**: not covered — requires property-based tests across arbitrary `(expires_at, refresh_window)` pairs.
 - **E-CACHE-6 (provider panic)**: not covered — panic propagation through `tokio::sync::RwLock` is a runtime concern; would require a purpose-built panicking mock.
 - **Concurrency on stale cache**: A-CACHE-6 covers an empty cache; serialization on a stale-but-valid cache (Rules 3/4) is not covered by a dedicated concurrency test.
+- **Fuzz concurrency path**: `fuzz_caching.rs` uses `new_current_thread()` and cannot exercise the concurrent thundering-herd path (A-CACHE-6). This is acceptable — A-CACHE-6 is covered by the dedicated unit test.

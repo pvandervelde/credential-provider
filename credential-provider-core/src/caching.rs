@@ -117,6 +117,10 @@ where
     ///
     /// The cache starts empty. The first call to `get()` will always perform
     /// a live fetch.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `refresh_before_expiry` is [`Duration::ZERO`].
     pub fn new(inner: P, refresh_before_expiry: Duration) -> Self {
         assert!(
             !refresh_before_expiry.is_zero(),

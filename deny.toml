@@ -1,6 +1,11 @@
 # cargo deny configuration
 # Run: cargo deny check
 # See: https://embarkstudios.github.io/cargo-deny/
+#
+# Note: this version of cargo-deny does not support an explicit `unmaintained`
+# policy field in [advisories]. Unmaintained crates produce warnings (not hard
+# failures) by default. Individually reviewed unmaintained advisories are
+# listed in the ignore block below.
 
 [advisories]
 # Ignore advisories that have been reviewed and accepted below

@@ -3,8 +3,8 @@
 use std::time::{Duration, Instant};
 
 use credential_provider_core::{
-    mock::MockCredentialProvider, CachingCredentialProvider, CredentialError,
-    CredentialProvider, SecretString, UsernamePassword,
+    mock::MockCredentialProvider, CachingCredentialProvider, CredentialError, CredentialProvider,
+    SecretString, UsernamePassword,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -84,13 +84,15 @@ fuzz_target!(|data: &[u8]| {
     let mock = MockCredentialProvider::from_sequence(responses);
     let provider = CachingCredentialProvider::new(mock, refresh_window);
 
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .build()
-        .expect("tokio rt must build");
+    thread_local! {
+        static RT: tokio::runtime::Runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("tokio rt must build");
+    }
 
     // ── First call: cache is always empty ────────────────────────────────────
 
-    let first = rt.block_on(provider.get());
+    let first = RT.with(|rt| rt.block_on(provider.get()));
 
     if !first_ok {
         // Rule 1: empty cache + inner error → Unavailable (not the inner variant).
@@ -110,11 +112,16 @@ fuzz_target!(|data: &[u8]| {
 
     // ── Second call: exercises Rules 2–5 depending on expiry_kind ────────────
 
-    let second = rt.block_on(provider.get());
+    let second = RT.with(|rt| rt.block_on(provider.get()));
 
     // Rule 5 invariant: expired credential + inner error must propagate the inner
     // error variant, NOT wrap it in Unavailable (which is only for empty-cache).
     if expiry_kind == 1 && !second_ok {
+        assert!(
+            second.is_err(),
+            "expired-cache + inner error must return Err (Rule 5), got Ok; {:?}",
+            second,
+        );
         if let Err(ref e) = second {
             assert!(
                 !matches!(e, CredentialError::Unavailable),
@@ -127,6 +134,6 @@ fuzz_target!(|data: &[u8]| {
 
     // ── Extra calls: verify the state machine does not panic ─────────────────
     for _ in 0..extra_calls {
-        let _ = rt.block_on(provider.get());
+        let _ = RT.with(|rt| rt.block_on(provider.get()));
     }
 });
