@@ -2,8 +2,8 @@
 
 use std::time::{Duration, Instant};
 
-use tokio::sync::{Mutex, RwLock};
 use metrics::counter;
+use tokio::sync::{Mutex, RwLock};
 use tracing::warn;
 
 use crate::{BoxFuture, Credential, CredentialError, CredentialProvider};
@@ -129,7 +129,6 @@ where
             refresh_lock: Mutex::new(()),
         }
     }
-
 }
 
 impl<C, P> CredentialProvider<C> for CachingCredentialProvider<C, P>
@@ -155,12 +154,11 @@ where
             // fields exist: the cached original and the return value.
             {
                 let read_guard = self.cached.read().await;
-                if let Some(c) = &*read_guard {
-                    if c.is_valid()
-                        && !is_inside_refresh_window(c.expires_at(), self.refresh_before_expiry)
-                    {
-                        return Ok(c.clone());
-                    }
+                if let Some(c) = &*read_guard
+                    && c.is_valid()
+                    && !is_inside_refresh_window(c.expires_at(), self.refresh_before_expiry)
+                {
+                    return Ok(c.clone());
                 }
             } // read_guard dropped here — no secret copies in flight during lock acquisition
 
@@ -176,18 +174,18 @@ where
             };
 
             // Thundering-herd guard: another task may have refreshed while we waited.
-            if let Some(c) = &post_lock_snapshot {
-                if c.is_valid()
-                    && !is_inside_refresh_window(c.expires_at(), self.refresh_before_expiry)
-                {
-                    return Ok(c.clone());
-                }
+            if let Some(c) = &post_lock_snapshot
+                && c.is_valid()
+                && !is_inside_refresh_window(c.expires_at(), self.refresh_before_expiry)
+            {
+                return Ok(c.clone());
             }
 
             // Classify for post-fetch error handling using the post-lock state.
             let cache_was_empty = post_lock_snapshot.is_none();
-            let cached_was_valid =
-                post_lock_snapshot.as_ref().map_or(false, Credential::is_valid);
+            let cached_was_valid = post_lock_snapshot
+                .as_ref()
+                .is_some_and(Credential::is_valid);
 
             // Fetch from the inner provider.
             match self.inner.get().await {

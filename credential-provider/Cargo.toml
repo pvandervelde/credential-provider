@@ -44,3 +44,8 @@ aws = ["dep:aws-config", "dep:aws-credential-types"]
 # Exposes MockCredentialProvider for use in downstream test code.
 # Must never be enabled in production builds.
 test-support = ["credential-provider-core/test-support"]
+
+[dev-dependencies]
+# Enable the test-support feature on core when running tests so that
+# test_support.rs (gated on cfg(test)) can access mock::MockCredentialProvider.
+credential-provider-core = { path = "../credential-provider-core", features = ["test-support"] }

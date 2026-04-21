@@ -1,0 +1,5 @@
+[default.extend-words]
+# AKS = Azure Kubernetes Service (valid acronym, not a typo for "ASK")
+AKS = "AKS"
+# HashiCorp is the correct spelling of the company name
+Hashi = "Hashi"

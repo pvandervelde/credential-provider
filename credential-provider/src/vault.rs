@@ -166,7 +166,9 @@ impl VaultProvider<UsernamePassword> {
         mount: impl Into<String>,
         path: impl Into<String>,
     ) -> Self {
-        unimplemented!("See docs/spec/interfaces/vault-adapter.md — dynamic_credentials constructor")
+        unimplemented!(
+            "See docs/spec/interfaces/vault-adapter.md — dynamic_credentials constructor"
+        )
     }
 
     /// Creates a provider that reads a `UsernamePassword` from a KV v2 secret.
@@ -187,7 +189,9 @@ impl VaultProvider<UsernamePassword> {
         username_field: impl Into<String>,
         password_field: impl Into<String>,
     ) -> Self {
-        unimplemented!("See docs/spec/interfaces/vault-adapter.md — kv2_username_password constructor")
+        unimplemented!(
+            "See docs/spec/interfaces/vault-adapter.md — kv2_username_password constructor"
+        )
     }
 }
 

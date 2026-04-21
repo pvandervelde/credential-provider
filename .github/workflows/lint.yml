@@ -91,8 +91,9 @@ jobs:
   semver:
     name: cargo-semver-checks
     runs-on: ubuntu-latest
-    # Requires at least one published version on crates.io to compare against.
-    continue-on-error: true
+    # Only run on master — requires at least one published version on crates.io.
+    # Skip on PRs and feature branches where no baseline exists yet.
+    if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Install Rust toolchain
