@@ -18,7 +18,7 @@ thiserror = "1"
 tokio     = { version = "1", features = ["sync", "time"] }
 
 # Vault backend — mark optional = true in member Cargo.toml
-vaultrs = { version = "0.7", default-features = false, features = ["rustls"] }
+vaultrs = { version = "0.8", default-features = false, features = ["rustls"] }
 
 # Azure backend — mark optional = true in member Cargo.toml
 azure_identity = { version = "0.19" }
@@ -30,3 +30,9 @@ aws-credential-types = { version = "1" }
 
 # JSON parsing — used by vault feature; mark optional = true in member Cargo.toml
 serde_json = { version = "1" }
+
+# Structured logging
+tracing = "0.1"
+
+# Metrics facade
+metrics = "0.24"

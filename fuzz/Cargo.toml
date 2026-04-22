@@ -1,0 +1,22 @@
+[package]
+name = "credential-provider-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+credential-provider-core = { path = "../credential-provider-core", features = ["test-support"] }
+tokio = { version = "1", features = ["rt"] }
+
+# Prevent this from interfering with the parent workspace
+[workspace]
+
+[[bin]]
+name = "fuzz_caching"
+path = "fuzz_targets/fuzz_caching.rs"
+test = false
+doc = false

@@ -1,7 +1,9 @@
 // SPEC: docs/spec/interfaces/env-adapters.md
 #![allow(dead_code)]
 
-use credential_provider_core::{BearerToken, BoxFuture, CredentialError, CredentialProvider, HmacSecret, UsernamePassword};
+use credential_provider_core::{
+    BearerToken, BoxFuture, CredentialError, CredentialProvider, HmacSecret, UsernamePassword,
+};
 
 // ---------------------------------------------------------------------------
 // EnvUsernamePasswordProvider

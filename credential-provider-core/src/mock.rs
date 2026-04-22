@@ -4,8 +4,8 @@
 // `test-support` feature is explicitly enabled. It must never be compiled
 // into production builds.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio::sync::Mutex;
 
@@ -84,7 +84,10 @@ impl<C: Credential> MockCredentialProvider<C> {
     ///
     /// Panics if `responses` is empty.
     pub fn from_sequence(responses: Vec<Result<C, CredentialError>>) -> Self {
-        assert!(!responses.is_empty(), "MockCredentialProvider::from_sequence requires at least one response");
+        assert!(
+            !responses.is_empty(),
+            "MockCredentialProvider::from_sequence requires at least one response"
+        );
         Self {
             responses: Mutex::new(responses),
             call_count: Arc::new(AtomicUsize::new(0)),

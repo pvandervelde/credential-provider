@@ -1,11 +1,27 @@
 // SPEC: docs/spec/interfaces/caching.md
-#![allow(dead_code)]
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use metrics::counter;
 use tokio::sync::{Mutex, RwLock};
+use tracing::warn;
 
 use crate::{BoxFuture, Credential, CredentialError, CredentialProvider};
+
+/// Returns `true` when the credential will expire within `refresh_before_expiry`.
+///
+/// A credential with no expiry (`None`) is never inside the refresh window.
+/// The comparison uses `<=` so that the at-boundary case is treated as inside
+/// the window (see E-CACHE-2).
+fn is_inside_refresh_window(expires_at: Option<Instant>, refresh_before_expiry: Duration) -> bool {
+    match expires_at {
+        None => false,
+        Some(exp) => {
+            let remaining = exp.saturating_duration_since(Instant::now());
+            remaining <= refresh_before_expiry
+        }
+    }
+}
 
 /// A caching wrapper around any [`CredentialProvider<C>`].
 ///
@@ -101,7 +117,15 @@ where
     ///
     /// The cache starts empty. The first call to `get()` will always perform
     /// a live fetch.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `refresh_before_expiry` is [`Duration::ZERO`].
     pub fn new(inner: P, refresh_before_expiry: Duration) -> Self {
+        assert!(
+            !refresh_before_expiry.is_zero(),
+            "refresh_before_expiry must be a positive Duration"
+        );
         Self {
             inner,
             cached: RwLock::new(None),
@@ -109,7 +133,6 @@ where
             refresh_lock: Mutex::new(()),
         }
     }
-
 }
 
 impl<C, P> CredentialProvider<C> for CachingCredentialProvider<C, P>
@@ -129,6 +152,91 @@ where
     /// the inner provider fetch fails, or propagates the inner provider error
     /// when the cached credential has expired and the fetch fails.
     fn get(&self) -> BoxFuture<'_, Result<C, CredentialError>> {
-        Box::pin(async move { unimplemented!("See docs/spec/interfaces/caching.md") })
+        Box::pin(async move {
+            // Rule 2 / Rule 6 — hot path: read under short-lived guard.
+            // Drop the guard before any await. Only two copies of secret
+            // fields exist: the cached original and the return value.
+            {
+                let read_guard = self.cached.read().await;
+                if let Some(c) = &*read_guard
+                    && c.is_valid()
+                    && !is_inside_refresh_window(c.expires_at(), self.refresh_before_expiry)
+                {
+                    return Ok(c.clone());
+                }
+            } // read_guard dropped here — no secret copies in flight during lock acquisition
+
+            // Rules 1, 3, 4, 5: serialize concurrent fetches.
+            let _refresh_guard = self.refresh_lock.lock().await;
+
+            // Post-lock snapshot: serves as both the thundering-herd recheck
+            // and the stale-fallback candidate. Derived after acquiring the lock
+            // so it reflects the most recent cache state.
+            let post_lock_snapshot: Option<C> = {
+                let read_guard = self.cached.read().await;
+                read_guard.clone()
+            };
+
+            // Thundering-herd guard: another task may have refreshed while we waited.
+            if let Some(c) = &post_lock_snapshot
+                && c.is_valid()
+                && !is_inside_refresh_window(c.expires_at(), self.refresh_before_expiry)
+            {
+                return Ok(c.clone());
+            }
+
+            // Classify for post-fetch error handling using the post-lock state.
+            let cache_was_empty = post_lock_snapshot.is_none();
+            let cached_was_valid = post_lock_snapshot
+                .as_ref()
+                .is_some_and(Credential::is_valid);
+
+            // Fetch from the inner provider.
+            match self.inner.get().await {
+                Ok(new_cred) => {
+                    {
+                        let mut write_guard = self.cached.write().await;
+                        *write_guard = Some(new_cred.clone());
+                    }
+                    Ok(new_cred)
+                }
+                Err(e) => {
+                    if cache_was_empty {
+                        // Rule 1: empty cache + failed fetch → always Unavailable.
+                        Err(CredentialError::Unavailable)
+                    } else if cached_was_valid {
+                        // Rule 3/4: was valid (inside window) + failed fetch.
+                        // `cached_was_valid` being true here implies the credential was also
+                        // inside the refresh window — the thundering-herd guard (above) already
+                        // returned early for the valid+outside-window case. So this is
+                        // Rule 3/4 territory.
+                        // Re-check validity RIGHT NOW — time has passed during the fetch.
+                        let stale = post_lock_snapshot.unwrap();
+                        if stale.is_valid() {
+                            let remaining_validity_secs = stale
+                                .expires_at()
+                                .map(|e| e.saturating_duration_since(Instant::now()).as_secs());
+                            warn!(
+                                error = %e,
+                                remaining_validity_secs = remaining_validity_secs,
+                                "stale credential fallback: refresh failed while cache is still valid"
+                            );
+                            counter!("credential_cache_stale_fallbacks_total").increment(1);
+                            Ok(stale)
+                        } else {
+                            // Expired during the fetch; fall through to Rule 5.
+                            Err(e)
+                        }
+                    } else {
+                        // Rule 5: expired + failed fetch → propagate the actual error.
+                        Err(e)
+                    }
+                }
+            }
+        })
     }
 }
+
+#[cfg(test)]
+#[path = "caching_tests.rs"]
+mod tests;

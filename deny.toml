@@ -1,0 +1,49 @@
+# cargo deny configuration
+# Run: cargo deny check
+# See: https://embarkstudios.github.io/cargo-deny/
+#
+# Note: this version of cargo-deny does not support an explicit `unmaintained`
+# policy field in [advisories]. Unmaintained crates produce warnings (not hard
+# failures) by default. Individually reviewed unmaintained advisories are
+# listed in the ignore block below.
+
+[advisories]
+# Ignore advisories that have been reviewed and accepted below
+ignore = [
+    # RUSTSEC-2026-0097: rand unsound with custom logger
+    # Affects: azure_core/azure_identity transitive deps (rand 0.7.3, 0.8.5)
+    # Status: Accepted — no direct exploit path; awaiting azure-sdk-for-rust fix
+    # Review-by: 2026-07-20
+    { id = "RUSTSEC-2026-0097", reason = "Transitive via azure_core; no direct exploit path; tracked upstream" },
+
+    # RUSTSEC-2024-0384: instant unmaintained
+    # Affects: azure_core -> http-types -> fastrand
+    # Status: Accepted — no security impact; awaiting azure-sdk-for-rust fix
+    { id = "RUSTSEC-2024-0384", reason = "Transitive via azure_core; unmaintained but no CVE; tracked upstream" },
+
+    # RUSTSEC-2024-0436: paste unmaintained
+    # Affects: azure_core
+    # Status: Accepted — no security impact; awaiting azure-sdk-for-rust fix
+    { id = "RUSTSEC-2024-0436", reason = "Transitive via azure_core; unmaintained but no CVE; tracked upstream" },
+
+    # RUSTSEC-2025-0134: rustls-pemfile unmaintained
+    # Affects: azure_core -> reqwest 0.11.x
+    # Status: Accepted — no security impact; awaiting azure-sdk-for-rust fix
+    { id = "RUSTSEC-2025-0134", reason = "Transitive via azure_core; unmaintained but no CVE; tracked upstream" },
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "OpenSSL",
+]
+
+[bans]
+# Prevent features that introduce native-tls (project uses rustls exclusively)
+deny = [{ name = "openssl-sys" }, { name = "native-tls" }]

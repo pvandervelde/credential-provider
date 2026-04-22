@@ -11,6 +11,11 @@ description = "Provider-agnostic credential management traits and types for Rust
 secrecy   = { workspace = true }
 thiserror = { workspace = true }
 tokio     = { workspace = true }
+tracing   = { workspace = true }
+metrics   = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
 
 [features]
 # Exposes MockCredentialProvider for use in downstream test code.
