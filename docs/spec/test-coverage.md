@@ -4,6 +4,59 @@ Maps behavioral assertions to test cases. Updated when new test suites are added
 
 ---
 
+## Credential Types (UsernamePassword, BearerToken, HmacSecret, TlsClientCertificate)
+
+**Source:** `credential-provider-core/src/credentials.rs` — `#[cfg(test)] mod tests`
+**Criticality:** Core value types — Tier 1 required
+
+### Specification Tests (Tier 1 — from assertions.md)
+
+| Assertion | Type | Test name |
+|---|---|---|
+| A-CRED-1: no-expiry is always valid | UsernamePassword | `test_username_password_no_expiry_is_valid` |
+| A-CRED-1: no-expiry expires_at is None | UsernamePassword | `test_username_password_no_expiry_expires_at_is_none` |
+| A-CRED-2: future expiry is valid | UsernamePassword | `test_username_password_future_expiry_is_valid` |
+| A-CRED-3: past expiry is invalid | UsernamePassword | `test_username_password_past_expiry_is_invalid` |
+| A-CRED-1: no-expiry is always valid | BearerToken | `test_bearer_token_no_expiry_is_valid` |
+| A-CRED-1: no-expiry expires_at is None | BearerToken | `test_bearer_token_no_expiry_expires_at_is_none` |
+| A-CRED-2: future expiry is valid | BearerToken | `test_bearer_token_future_expiry_is_valid` |
+| A-CRED-3: past expiry is invalid | BearerToken | `test_bearer_token_past_expiry_is_invalid` |
+| A-CRED-4: HmacSecret is always valid | HmacSecret | `test_hmac_secret_is_always_valid` |
+| A-CRED-4: HmacSecret expires_at is None | HmacSecret | `test_hmac_secret_expires_at_is_always_none` |
+| A-CRED-1: no-expiry is always valid | TlsClientCertificate | `test_tls_client_cert_no_expiry_is_valid` |
+| A-CRED-1: no-expiry expires_at is None | TlsClientCertificate | `test_tls_client_cert_no_expiry_expires_at_is_none` |
+| A-CRED-2: future expiry is valid | TlsClientCertificate | `test_tls_client_cert_future_expiry_is_valid` |
+| A-CRED-3: past expiry is invalid | TlsClientCertificate | `test_tls_client_cert_past_expiry_is_invalid` |
+
+### Boundary / Security Tests (Tier 2)
+
+| Scenario | Type | Test name |
+|---|---|---|
+| expires_at() returns stored value | UsernamePassword | `test_username_password_expires_at_returns_stored_value` |
+| expires_at() returns stored value | BearerToken | `test_bearer_token_expires_at_returns_stored_value` |
+| expires_at() returns stored value | TlsClientCertificate | `test_tls_client_cert_expires_at_returns_stored_value` |
+| Debug redacts password, shows username | UsernamePassword | `test_username_password_debug_shows_username_and_redacts_password` |
+| Debug redacts token | BearerToken | `test_bearer_token_debug_redacts_token` |
+| Debug redacts key bytes | HmacSecret | `test_hmac_secret_debug_redacts_key` |
+| Debug redacts both PEM fields | TlsClientCertificate | `test_tls_client_cert_debug_redacts_pem_fields` |
+
+---
+
+## MockCredentialProvider
+
+**Source:** `credential-provider-core/src/mock.rs` — `#[cfg(test)] mod tests`
+
+| Scenario | Test name |
+|---|---|
+| call_count() is 0 before any calls | `test_call_count_is_zero_before_any_calls` |
+| call_count() is 1 after one get() | `test_call_count_is_one_after_one_call` |
+| call_count() increments correctly | `test_call_count_increments_over_multiple_calls` |
+| returning_ok repeats credential | `test_returning_ok_repeats_credential` |
+| returning_err repeats error | `test_returning_err_repeats_error` |
+| from_sequence delivers in order, repeats last | `test_from_sequence_delivers_in_order_and_repeats_last` |
+
+---
+
 ## CachingCredentialProvider::get()
 
 **Source:** `credential-provider-core/src/caching.rs` — `#[cfg(test)] mod tests`

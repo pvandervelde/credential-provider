@@ -227,3 +227,7 @@ impl TlsClientCertificate {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "credentials_tests.rs"]
+mod tests;

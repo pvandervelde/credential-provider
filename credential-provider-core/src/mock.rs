@@ -115,3 +115,7 @@ impl<C: Credential> CredentialProvider<C> for MockCredentialProvider<C> {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "mock_tests.rs"]
+mod tests;
