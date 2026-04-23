@@ -91,11 +91,14 @@ jobs:
   semver:
     name: cargo-semver-checks
     runs-on: ubuntu-latest
-    # Only run on master — requires at least one published version on crates.io.
-    # Skip on PRs and feature branches where no baseline exists yet.
+    # Only run on master — compares against the previous commit on master so
+    # that breaking API changes cannot be merged without an explicit version bump.
+    # Does not require the crates to be published on crates.io.
     if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 2
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
@@ -103,5 +106,5 @@ jobs:
         uses: taiki-e/install-action@58e862542551f667fa44c8a2a4a1d64ad477c96a # v2
         with:
           tool: cargo-semver-checks
-      - name: Check semver compatibility
-        run: cargo semver-checks
+      - name: Check semver compatibility against previous commit
+        run: cargo semver-checks --baseline-rev HEAD~1
