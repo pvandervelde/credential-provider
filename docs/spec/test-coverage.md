@@ -6,7 +6,7 @@ Maps behavioral assertions to test cases. Updated when new test suites are added
 
 ## Credential Types (UsernamePassword, BearerToken, HmacSecret, TlsClientCertificate)
 
-**Source:** `credential-provider-core/src/credentials.rs` — `#[cfg(test)] mod tests`
+**Source:** `credential-provider-core/src/credentials_tests.rs` (linked via `#[path]` in `credentials.rs`)
 **Criticality:** Core value types — Tier 1 required
 
 ### Specification Tests (Tier 1 — from assertions.md)
@@ -46,7 +46,7 @@ Maps behavioral assertions to test cases. Updated when new test suites are added
 
 ## MockCredentialProvider
 
-**Source:** `credential-provider-core/src/mock.rs` — `#[cfg(test)] mod tests`
+**Source:** `credential-provider-core/src/mock_tests.rs` (linked via `#[path]` in `mock.rs`)
 
 | Scenario | Test name |
 |---|---|

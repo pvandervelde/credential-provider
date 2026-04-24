@@ -122,18 +122,30 @@ These providers delegate to their respective SDKs and are difficult to test with
 ## Test Organization
 
 ```
-crates/credential-provider-core/
+credential-provider-core/
 └── src/
-    ├── credential.rs    # inline #[cfg(test)] mod tests for credential types
-    ├── cache.rs         # inline #[cfg(test)] mod tests for caching logic
-    └── error.rs         # inline #[cfg(test)] mod tests (if any behavior to test)
+    ├── credentials.rs         # #[path = "credentials_tests.rs"] mod tests;
+    ├── credentials_tests.rs   # adjacent test file for credential types
+    ├── caching.rs             # #[path = "caching_tests.rs"] mod tests;
+    ├── caching_tests.rs       # adjacent test file for caching logic
+    ├── mock.rs                # #[path = "mock_tests.rs"] mod tests;
+    └── mock_tests.rs          # adjacent test file for MockCredentialProvider
 
-crates/credential-provider/
+credential-provider/
 ├── src/
-│   ├── env.rs           # inline #[cfg(test)] mod tests for env providers
-│   └── vault.rs         # inline #[cfg(test)] mod tests for mapping functions
+│   ├── env.rs                 # #[path = "env_tests.rs"] mod tests;
+│   └── vault.rs               # #[path = "vault_tests.rs"] mod tests;
 └── tests/
-    └── vault_integration.rs  # #[ignore] integration tests requiring Vault
+    └── vault_integration.rs   # #[ignore] integration tests requiring Vault
+```
+
+Test files are never inline — all tests live in an adjacent `_tests.rs` file
+and are referenced from the source file with:
+
+```rust
+#[cfg(test)]
+#[path = "<module>_tests.rs"]
+mod tests;
 ```
 
 ---
