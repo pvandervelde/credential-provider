@@ -5,7 +5,7 @@
 
 use std::time::{Duration, Instant};
 
-use secrecy::{SecretString, SecretVec};
+use secrecy::{ExposeSecret, SecretString, SecretVec};
 
 use super::{BearerToken, HmacSecret, TlsClientCertificate, UsernamePassword};
 use crate::Credential;
@@ -257,5 +257,61 @@ fn test_tls_client_cert_debug_redacts_pem_fields() {
     assert!(
         !debug.contains("key-secret-material"),
         "private key PEM must not appear in Debug output; got: {debug}"
+    );
+}
+
+// ── Clone isolation ───────────────────────────────────────────────────────────
+// HmacSecret and TlsClientCertificate both have hand-written Clone
+// implementations that copy bytes via ExposeSecret rather than sharing memory.
+// These tests verify that a clone is an independent allocation, not a shared
+// reference — as required by docs/spec/testing.md.
+
+/// Clone produces an independent copy of HmacSecret key bytes.
+///
+/// Verifies that the cloned SecretVec contains the same bytes at a different
+/// memory address, confirming no shared allocation.
+#[test]
+fn test_hmac_secret_clone_is_independent() {
+    let original = HmacSecret::new(SecretVec::new(vec![1u8, 2, 3, 4]));
+    let cloned = original.clone();
+    assert_eq!(
+        original.key.expose_secret(),
+        cloned.key.expose_secret(),
+        "cloned HmacSecret must contain the same bytes as the original"
+    );
+    assert_ne!(
+        original.key.expose_secret().as_ptr(),
+        cloned.key.expose_secret().as_ptr(),
+        "cloned HmacSecret must be a separate allocation, not a shared reference"
+    );
+}
+
+/// Clone produces an independent copy of TlsClientCertificate PEM bytes.
+///
+/// Checks both the certificate and private key fields for independent
+/// allocations.
+#[test]
+fn test_tls_client_cert_clone_is_independent() {
+    let original = tls_cert(Some(future()));
+    let cloned = original.clone();
+    assert_eq!(
+        original.certificate_pem.expose_secret(),
+        cloned.certificate_pem.expose_secret(),
+        "cloned TlsClientCertificate certificate_pem must contain the same bytes"
+    );
+    assert_ne!(
+        original.certificate_pem.expose_secret().as_ptr(),
+        cloned.certificate_pem.expose_secret().as_ptr(),
+        "cloned TlsClientCertificate certificate_pem must be a separate allocation"
+    );
+    assert_eq!(
+        original.private_key_pem.expose_secret(),
+        cloned.private_key_pem.expose_secret(),
+        "cloned TlsClientCertificate private_key_pem must contain the same bytes"
+    );
+    assert_ne!(
+        original.private_key_pem.expose_secret().as_ptr(),
+        cloned.private_key_pem.expose_secret().as_ptr(),
+        "cloned TlsClientCertificate private_key_pem must be a separate allocation"
     );
 }

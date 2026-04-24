@@ -59,8 +59,7 @@ async fn test_call_count_increments_over_multiple_calls() {
     assert_eq!(
         mock.call_count(),
         3,
-        "call_count must equal the number of get() calls; got {}",
-        mock.call_count()
+        "call_count must equal the number of get() calls"
     );
 }
 
@@ -76,7 +75,7 @@ async fn test_returning_ok_repeats_credential() {
     assert_eq!(r2.username, "testuser");
 }
 
-/// returning_err repeats the error on every call.
+/// returning_err repeats the error on every call and tracks call_count.
 #[tokio::test]
 async fn test_returning_err_repeats_error() {
     let mock = MockCredentialProvider::<UsernamePassword>::returning_err(CredentialError::Backend(
@@ -86,6 +85,11 @@ async fn test_returning_err_repeats_error() {
     let r2 = mock.get().await;
     assert!(matches!(r1, Err(CredentialError::Backend(_))));
     assert!(matches!(r2, Err(CredentialError::Backend(_))));
+    assert_eq!(
+        mock.call_count(),
+        2,
+        "call_count must reflect error calls too"
+    );
 }
 
 /// from_sequence delivers values in order and repeats the last entry.

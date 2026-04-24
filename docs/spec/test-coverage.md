@@ -39,6 +39,8 @@ Maps behavioral assertions to test cases. Updated when new test suites are added
 | Debug redacts token | BearerToken | `test_bearer_token_debug_redacts_token` |
 | Debug redacts key bytes | HmacSecret | `test_hmac_secret_debug_redacts_key` |
 | Debug redacts both PEM fields | TlsClientCertificate | `test_tls_client_cert_debug_redacts_pem_fields` |
+| Clone produces independent copy (different allocation) | HmacSecret | `test_hmac_secret_clone_is_independent` |
+| Clone produces independent copy — cert and key fields | TlsClientCertificate | `test_tls_client_cert_clone_is_independent` |
 
 ---
 
