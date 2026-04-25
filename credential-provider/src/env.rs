@@ -1,9 +1,34 @@
 // SPEC: docs/spec/interfaces/env-adapters.md
-#![allow(dead_code)]
 
 use credential_provider_core::{
-    BearerToken, BoxFuture, CredentialError, CredentialProvider, HmacSecret, UsernamePassword,
+    BearerToken, BoxFuture, CredentialError, CredentialProvider, HmacSecret, SecretString,
+    SecretVec, UsernamePassword,
 };
+
+// ---------------------------------------------------------------------------
+// Internal helper
+// ---------------------------------------------------------------------------
+
+/// Reads an environment variable by name.
+///
+/// Returns:
+/// - `Ok(value)` — variable is set and non-empty
+/// - `Err(CredentialError::Configuration)` — variable is absent or empty
+/// - `Err(CredentialError::Configuration)` — variable contains non-UTF-8 bytes
+fn read_env_var(name: &str) -> Result<String, CredentialError> {
+    match std::env::var(name) {
+        Ok(value) if value.is_empty() => Err(CredentialError::Configuration(format!(
+            "missing env var: {name}"
+        ))),
+        Ok(value) => Ok(value),
+        Err(std::env::VarError::NotPresent) => Err(CredentialError::Configuration(format!(
+            "missing env var: {name}"
+        ))),
+        Err(std::env::VarError::NotUnicode(_)) => Err(CredentialError::Configuration(format!(
+            "variable contains invalid UTF-8: {name}"
+        ))),
+    }
+}
 
 // ---------------------------------------------------------------------------
 // EnvUsernamePasswordProvider
@@ -51,7 +76,19 @@ impl EnvUsernamePasswordProvider {
 
 impl CredentialProvider<UsernamePassword> for EnvUsernamePasswordProvider {
     fn get(&self) -> BoxFuture<'_, Result<UsernamePassword, CredentialError>> {
-        Box::pin(async move { unimplemented!("See docs/spec/interfaces/env-adapters.md") })
+        // Clone names before entering the async block to satisfy 'static lifetime
+        // requirements on the Future and to avoid borrowing `self` across an await.
+        let username_var = self.username_var.clone();
+        let password_var = self.password_var.clone();
+        Box::pin(async move {
+            let username = read_env_var(&username_var)?;
+            let password = read_env_var(&password_var)?;
+            Ok(UsernamePassword::new(
+                username,
+                SecretString::new(password),
+                None,
+            ))
+        })
     }
 }
 
@@ -62,7 +99,9 @@ impl CredentialProvider<UsernamePassword> for EnvUsernamePasswordProvider {
 /// Reads a hex- or base64-encoded HMAC key from an environment variable.
 ///
 /// The variable is read on every call to `get()`. The encoding format (hex or
-/// base64) is detected automatically.
+/// base64) is detected automatically: hex is tried first, then base64 (standard
+/// alphabet with padding). A value that is valid hex will never be interpreted
+/// as base64.
 ///
 /// The returned [`HmacSecret`] has `is_valid() == true` and
 /// `expires_at() == None` (HMAC keys do not expire).
@@ -96,7 +135,26 @@ impl EnvHmacSecretProvider {
 
 impl CredentialProvider<HmacSecret> for EnvHmacSecretProvider {
     fn get(&self) -> BoxFuture<'_, Result<HmacSecret, CredentialError>> {
-        Box::pin(async move { unimplemented!("See docs/spec/interfaces/env-adapters.md") })
+        let secret_var = self.secret_var.clone();
+        Box::pin(async move {
+            let raw = read_env_var(&secret_var)?;
+
+            // Attempt hex decode first; on failure fall back to base64 standard.
+            let bytes = if let Ok(decoded) = hex::decode(&raw) {
+                decoded
+            } else {
+                use base64::Engine as _;
+                base64::engine::general_purpose::STANDARD
+                    .decode(&raw)
+                    .map_err(|_| {
+                        CredentialError::Configuration(format!(
+                            "invalid encoding for env var: {secret_var}"
+                        ))
+                    })?
+            };
+
+            Ok(HmacSecret::new(SecretVec::new(bytes)))
+        })
     }
 }
 
@@ -140,6 +198,14 @@ impl EnvBearerTokenProvider {
 
 impl CredentialProvider<BearerToken> for EnvBearerTokenProvider {
     fn get(&self) -> BoxFuture<'_, Result<BearerToken, CredentialError>> {
-        Box::pin(async move { unimplemented!("See docs/spec/interfaces/env-adapters.md") })
+        let token_var = self.token_var.clone();
+        Box::pin(async move {
+            let token = read_env_var(&token_var)?;
+            Ok(BearerToken::new(SecretString::new(token), None))
+        })
     }
 }
+
+#[cfg(test)]
+#[path = "env_tests.rs"]
+mod tests;

@@ -11,6 +11,10 @@ description = "Backend adapters for credential-provider-core (env, Vault, Azure,
 credential-provider-core = { path = "../credential-provider-core" }
 thiserror = { workspace = true }
 
+# env feature — encoding support for HMAC key decoding
+hex    = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+
 # vault feature
 vaultrs = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
@@ -27,8 +31,8 @@ aws-credential-types = { workspace = true, optional = true }
 [features]
 default = ["env"]
 
-# Environment variable provider — no external deps, always safe to include.
-env = []
+# Environment variable provider — hex/base64 for HMAC key decoding.
+env = ["dep:hex", "dep:base64"]
 
 # HashiCorp Vault provider. Generic VaultProvider<C> supporting any secrets engine.
 vault = ["dep:vaultrs", "dep:serde_json", "dep:tokio"]
@@ -49,3 +53,7 @@ test-support = ["credential-provider-core/test-support"]
 # Enable the test-support feature on core when running tests so that
 # test_support.rs (gated on cfg(test)) can access mock::MockCredentialProvider.
 credential-provider-core = { path = "../credential-provider-core", features = ["test-support"] }
+# Env-mutation isolation for env adapter tests
+temp-env = { workspace = true }
+# Async test runtime
+tokio = { workspace = true, features = ["macros", "rt"] }
