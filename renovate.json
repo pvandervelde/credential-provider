@@ -62,18 +62,19 @@
       ]
     },
     {
-      "description": "Group cryptography crates updates",
+      "description": "Group AWS SDK updates with reviewer assignment",
       "matchManagers": [
         "cargo"
       ],
-      "matchPackageNames": [
-        "hmac",
-        "sha2",
-        "hex"
-      ],
-      "groupName": "cryptography crates",
+      "groupName": "AWS SDK",
       "schedule": [
         "on the first day of the month"
+      ],
+      "reviewers": [
+        "pvandervelde"
+      ],
+      "matchPackageNames": [
+        "/^aws/"
       ]
     },
     {
@@ -112,7 +113,6 @@
         "minor",
         "patch"
       ],
-      "matchCurrentVersion": "!/^0/",
       "groupName": "standard dependencies",
       "schedule": [
         "on the first day of the month"
@@ -120,6 +120,7 @@
       "automerge": false,
       "matchPackageNames": [
         "!/^azure_/",
+        "!/^aws/",
         "!/^tokio/",
         "!/^serde/"
       ]
