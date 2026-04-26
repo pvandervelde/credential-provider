@@ -537,3 +537,300 @@ async fn bt_rereads_env_var_on_every_call() {
     )
     .await;
 }
+
+// ---------------------------------------------------------------------------
+// GAP-1: Error message prefix for absent/empty variables
+//
+// Tests verify that the error message begins with "missing env var: " so that
+// a mutation swapping the NotPresent and NotUnicode arm messages is detectable.
+// ---------------------------------------------------------------------------
+
+/// GAP-1 (UP): absent username error message starts with "missing env var: ".
+#[tokio::test]
+async fn up_missing_var_error_message_starts_with_missing_env_var() {
+    temp_env::async_with_vars(
+        [
+            ("UP_GAP1_USER", None::<&str>),
+            ("UP_GAP1_PASS", Some("pw")),
+        ],
+        async {
+            let provider =
+                EnvUsernamePasswordProvider::new("UP_GAP1_USER", "UP_GAP1_PASS");
+            let result = provider.get().await;
+            match result {
+                Err(credential_provider_core::CredentialError::Configuration(msg)) => {
+                    assert!(
+                        msg.starts_with("missing env var: "),
+                        "expected message to start with 'missing env var: ', got: {msg:?}"
+                    );
+                    assert!(msg.contains("UP_GAP1_USER"));
+                }
+                other => panic!(
+                    "expected Err(Configuration(..)), got {:?}",
+                    other.map(|_| "<Ok>")
+                ),
+            }
+        },
+    )
+    .await;
+}
+
+/// GAP-1 (HMAC): absent var error message starts with "missing env var: ".
+#[tokio::test]
+async fn hmac_missing_var_error_message_starts_with_missing_env_var() {
+    temp_env::async_with_vars(
+        [("HMAC_GAP1_SECRET", None::<&str>)],
+        async {
+            let provider = EnvHmacSecretProvider::new("HMAC_GAP1_SECRET");
+            let result = provider.get().await;
+            match result {
+                Err(credential_provider_core::CredentialError::Configuration(msg)) => {
+                    assert!(
+                        msg.starts_with("missing env var: "),
+                        "expected message to start with 'missing env var: ', got: {msg:?}"
+                    );
+                    assert!(msg.contains("HMAC_GAP1_SECRET"));
+                }
+                other => panic!(
+                    "expected Err(Configuration(..)), got {:?}",
+                    other.map(|_| "<Ok>")
+                ),
+            }
+        },
+    )
+    .await;
+}
+
+// ---------------------------------------------------------------------------
+// GAP-2: HMAC invalid-encoding message is distinct from missing-var message
+//
+// A mutation that returns "missing env var: {name}" instead of
+// "invalid encoding for env var: {name}" on decode failure would survive
+// any test that only checks for the var name substring.
+// ---------------------------------------------------------------------------
+
+/// GAP-2: HMAC invalid-encoding error message contains "invalid encoding".
+#[tokio::test]
+async fn hmac_invalid_encoding_error_message_distinguishable_from_missing_var() {
+    temp_env::async_with_vars(
+        [("HMAC_GAP2_SECRET", Some("not-valid-hex-or-base64!!!"))],
+        async {
+            let provider = EnvHmacSecretProvider::new("HMAC_GAP2_SECRET");
+            let result = provider.get().await;
+            match result {
+                Err(credential_provider_core::CredentialError::Configuration(msg)) => {
+                    assert!(
+                        msg.contains("invalid encoding"),
+                        "expected 'invalid encoding' in message, got: {msg:?}"
+                    );
+                    assert!(
+                        !msg.starts_with("missing env var: "),
+                        "decode-failure message must not look like an absent-var error, got: {msg:?}"
+                    );
+                    assert!(msg.contains("HMAC_GAP2_SECRET"));
+                }
+                other => panic!(
+                    "expected Err(Configuration(..)), got {:?}",
+                    other.map(|_| "<Ok>")
+                ),
+            }
+        },
+    )
+    .await;
+}
+
+// ---------------------------------------------------------------------------
+// GAP-3: Username/password read order
+//
+// When both vars are absent the implementation must read username first.
+// Swapping the two read_env_var() calls is undetectable by any test that
+// only has one var absent at a time.
+// ---------------------------------------------------------------------------
+
+/// GAP-3: both vars absent → error names the username var, not the password var.
+#[tokio::test]
+async fn up_both_absent_error_names_username_var_not_password_var() {
+    temp_env::async_with_vars(
+        [
+            ("UP_GAP3_USER", None::<&str>),
+            ("UP_GAP3_PASS", None::<&str>),
+        ],
+        async {
+            let provider =
+                EnvUsernamePasswordProvider::new("UP_GAP3_USER", "UP_GAP3_PASS");
+            let result = provider.get().await;
+            match result {
+                Err(credential_provider_core::CredentialError::Configuration(msg)) => {
+                    assert!(
+                        msg.contains("UP_GAP3_USER"),
+                        "error must name the username var when both are absent, got: {msg:?}"
+                    );
+                    assert!(
+                        !msg.contains("UP_GAP3_PASS"),
+                        "error must NOT name the password var when username is read first, got: {msg:?}"
+                    );
+                }
+                other => panic!(
+                    "expected Err(Configuration(..)), got {:?}",
+                    other.map(|_| "<Ok>")
+                ),
+            }
+        },
+    )
+    .await;
+}
+
+// ---------------------------------------------------------------------------
+// GAP-4: Absent-to-present transitions rule out construction-time caching
+//
+// The re-read tests in the main suite only exercise present→present transitions
+// (provider constructed while var is already set).  A provider that caches the
+// value at construction time would pass those tests.  These tests construct the
+// provider while the var is absent, confirm the first call fails, then set the
+// var and confirm the second call succeeds.
+// ---------------------------------------------------------------------------
+
+/// GAP-4 (UP): provider constructed before vars set — second call picks up the vars.
+#[tokio::test]
+async fn up_provider_constructed_before_vars_set_rereads_on_get() {
+    let provider =
+        EnvUsernamePasswordProvider::new("UP_GAP4_USER", "UP_GAP4_PASS");
+
+    // First call: vars not set → expect Configuration error.
+    let first_result = temp_env::async_with_vars(
+        [
+            ("UP_GAP4_USER", None::<&str>),
+            ("UP_GAP4_PASS", None::<&str>),
+        ],
+        async { provider.get().await },
+    )
+    .await;
+    assert!(
+        matches!(
+            first_result,
+            Err(credential_provider_core::CredentialError::Configuration(_))
+        ),
+        "first call with vars absent must fail, got: {:?}",
+        first_result.map(|_| "<Ok>")
+    );
+
+    // Second call: vars now set → expect success with correct values.
+    let second_result = temp_env::async_with_vars(
+        [
+            ("UP_GAP4_USER", Some("dave")),
+            ("UP_GAP4_PASS", Some("secret")),
+        ],
+        async { provider.get().await },
+    )
+    .await;
+    let cred = second_result.expect("second call with vars set must succeed");
+    assert_eq!(cred.username, "dave");
+    assert_eq!(cred.password.expose_secret(), "secret");
+}
+
+/// GAP-4 (HMAC): provider constructed before var set — second call picks up the var.
+#[tokio::test]
+async fn hmac_provider_constructed_before_var_set_rereads_on_get() {
+    let provider = EnvHmacSecretProvider::new("HMAC_GAP4_SECRET");
+
+    // First call: var not set → expect Configuration error.
+    let first_result = temp_env::async_with_vars(
+        [("HMAC_GAP4_SECRET", None::<&str>)],
+        async { provider.get().await },
+    )
+    .await;
+    assert!(
+        matches!(
+            first_result,
+            Err(credential_provider_core::CredentialError::Configuration(_))
+        ),
+        "first call with var absent must fail"
+    );
+
+    // Second call: var now set → expect success.
+    let second_result = temp_env::async_with_vars(
+        [("HMAC_GAP4_SECRET", Some("deadbeef"))],
+        async { provider.get().await },
+    )
+    .await;
+    let cred = second_result.expect("second call with var set must succeed");
+    assert_eq!(
+        cred.key.expose_secret().as_slice(),
+        &[0xDE, 0xAD, 0xBE, 0xEF]
+    );
+}
+
+/// GAP-4 (BT): provider constructed before var set — second call picks up the var.
+#[tokio::test]
+async fn bt_provider_constructed_before_var_set_rereads_on_get() {
+    let provider = EnvBearerTokenProvider::new("BT_GAP4_TOKEN");
+
+    // First call: var not set → expect Configuration error.
+    let first_result = temp_env::async_with_vars(
+        [("BT_GAP4_TOKEN", None::<&str>)],
+        async { provider.get().await },
+    )
+    .await;
+    assert!(
+        matches!(
+            first_result,
+            Err(credential_provider_core::CredentialError::Configuration(_))
+        ),
+        "first call with var absent must fail"
+    );
+
+    // Second call: var now set → expect success.
+    let second_result = temp_env::async_with_vars(
+        [("BT_GAP4_TOKEN", Some("my-token"))],
+        async { provider.get().await },
+    )
+    .await;
+    let cred = second_result.expect("second call with var set must succeed");
+    assert_eq!(cred.token.expose_secret(), "my-token");
+}
+
+// ---------------------------------------------------------------------------
+// GAP-6: NotUnicode branch of read_env_var (Unix only)
+//
+// std::env::VarError::NotUnicode is only reachable on Unix where env vars are
+// arbitrary byte sequences.  On Windows, vars are UTF-16 and the stdlib always
+// produces valid String, so this branch is unreachable there.
+// ---------------------------------------------------------------------------
+
+#[cfg(unix)]
+#[tokio::test]
+async fn up_non_utf8_username_returns_configuration_error_with_utf8_message() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let var_name = "UP_GAP6_NON_UTF8_USER";
+    let non_utf8 = OsStr::from_bytes(&[0xFF, 0xFE]);
+
+    // temp_env does not accept OsStr values, so set/remove manually.
+    // Safety: single-threaded test; temp_env's mutex serialises concurrent env
+    // mutations so no other test races with this unsafe block.
+    unsafe { std::env::set_var(var_name, non_utf8) };
+
+    let provider = EnvUsernamePasswordProvider::new(var_name, "UP_GAP6_PASS");
+    let result = temp_env::async_with_vars(
+        [("UP_GAP6_PASS", Some("pw"))],
+        async { provider.get().await },
+    )
+    .await;
+
+    unsafe { std::env::remove_var(var_name) };
+
+    match result {
+        Err(credential_provider_core::CredentialError::Configuration(msg)) => {
+            assert!(
+                msg.contains("invalid UTF-8"),
+                "expected 'invalid UTF-8' in message, got: {msg:?}"
+            );
+            assert!(msg.contains(var_name));
+        }
+        other => panic!(
+            "expected Err(Configuration(..)), got {:?}",
+            other.map(|_| "<Ok>")
+        ),
+    }
+}
