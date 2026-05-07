@@ -1,5 +1,6 @@
 // SPEC: docs/spec/interfaces/env-adapters.md
 
+use base64::Engine as _;
 use credential_provider_core::{
     BearerToken, BoxFuture, CredentialError, CredentialProvider, HmacSecret, SecretString,
     SecretVec, UsernamePassword,
@@ -76,13 +77,9 @@ impl EnvUsernamePasswordProvider {
 
 impl CredentialProvider<UsernamePassword> for EnvUsernamePasswordProvider {
     fn get(&self) -> BoxFuture<'_, Result<UsernamePassword, CredentialError>> {
-        // Clone names before entering the async block to satisfy 'static lifetime
-        // requirements on the Future and to avoid borrowing `self` across an await.
-        let username_var = self.username_var.clone();
-        let password_var = self.password_var.clone();
-        Box::pin(async move {
-            let username = read_env_var(&username_var)?;
-            let password = read_env_var(&password_var)?;
+        Box::pin(async {
+            let username = read_env_var(&self.username_var)?;
+            let password = read_env_var(&self.password_var)?;
             Ok(UsernamePassword::new(
                 username,
                 SecretString::new(password),
@@ -135,20 +132,19 @@ impl EnvHmacSecretProvider {
 
 impl CredentialProvider<HmacSecret> for EnvHmacSecretProvider {
     fn get(&self) -> BoxFuture<'_, Result<HmacSecret, CredentialError>> {
-        let secret_var = self.secret_var.clone();
-        Box::pin(async move {
-            let raw = read_env_var(&secret_var)?;
+        Box::pin(async {
+            let raw = read_env_var(&self.secret_var)?;
 
             // Attempt hex decode first; on failure fall back to base64 standard.
             let bytes = if let Ok(decoded) = hex::decode(&raw) {
                 decoded
             } else {
-                use base64::Engine as _;
                 base64::engine::general_purpose::STANDARD
                     .decode(&raw)
                     .map_err(|_| {
                         CredentialError::Configuration(format!(
-                            "invalid encoding for env var: {secret_var}"
+                            "invalid encoding for env var: {}",
+                            self.secret_var
                         ))
                     })?
             };
@@ -198,9 +194,8 @@ impl EnvBearerTokenProvider {
 
 impl CredentialProvider<BearerToken> for EnvBearerTokenProvider {
     fn get(&self) -> BoxFuture<'_, Result<BearerToken, CredentialError>> {
-        let token_var = self.token_var.clone();
-        Box::pin(async move {
-            let token = read_env_var(&token_var)?;
+        Box::pin(async {
+            let token = read_env_var(&self.token_var)?;
             Ok(BearerToken::new(SecretString::new(token), None))
         })
     }

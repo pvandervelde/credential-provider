@@ -50,8 +50,7 @@ async fn up_happy_path_returns_correct_username_and_password() {
             ("UP_TEST_PASS_1", Some("s3cr3t")),
         ],
         async {
-            let provider =
-                EnvUsernamePasswordProvider::new("UP_TEST_USER_1", "UP_TEST_PASS_1");
+            let provider = EnvUsernamePasswordProvider::new("UP_TEST_USER_1", "UP_TEST_PASS_1");
             let cred = provider.get().await.expect("should succeed");
             assert_eq!(cred.username, "alice");
             assert_eq!(cred.password.expose_secret(), "s3cr3t");
@@ -69,8 +68,7 @@ async fn up_username_field_matches_env_var() {
             ("UP_TEST_PASS_2", Some("pw")),
         ],
         async {
-            let provider =
-                EnvUsernamePasswordProvider::new("UP_TEST_USER_2", "UP_TEST_PASS_2");
+            let provider = EnvUsernamePasswordProvider::new("UP_TEST_USER_2", "UP_TEST_PASS_2");
             let cred = provider.get().await.expect("should succeed");
             assert_eq!(cred.username, "bob");
         },
@@ -87,8 +85,7 @@ async fn up_password_field_matches_env_var() {
             ("UP_TEST_PASS_3", Some("hunter2")),
         ],
         async {
-            let provider =
-                EnvUsernamePasswordProvider::new("UP_TEST_USER_3", "UP_TEST_PASS_3");
+            let provider = EnvUsernamePasswordProvider::new("UP_TEST_USER_3", "UP_TEST_PASS_3");
             let cred = provider.get().await.expect("should succeed");
             assert_eq!(cred.password.expose_secret(), "hunter2");
         },
@@ -105,10 +102,8 @@ async fn up_missing_username_returns_configuration_error() {
             ("UP_TEST_MISSING_PASS", Some("pw")),
         ],
         async {
-            let provider = EnvUsernamePasswordProvider::new(
-                "UP_TEST_MISSING_USER",
-                "UP_TEST_MISSING_PASS",
-            );
+            let provider =
+                EnvUsernamePasswordProvider::new("UP_TEST_MISSING_USER", "UP_TEST_MISSING_PASS");
             let result = provider.get().await;
             assert_configuration_error!(result, "UP_TEST_MISSING_USER");
         },
@@ -145,10 +140,8 @@ async fn up_empty_username_returns_configuration_error() {
             ("UP_TEST_EMPTY_USER_PASS", Some("pw")),
         ],
         async {
-            let provider = EnvUsernamePasswordProvider::new(
-                "UP_TEST_EMPTY_USER",
-                "UP_TEST_EMPTY_USER_PASS",
-            );
+            let provider =
+                EnvUsernamePasswordProvider::new("UP_TEST_EMPTY_USER", "UP_TEST_EMPTY_USER_PASS");
             let result = provider.get().await;
             assert_configuration_error!(result, "UP_TEST_EMPTY_USER");
         },
@@ -165,10 +158,8 @@ async fn up_empty_password_returns_configuration_error() {
             ("UP_TEST_EMPTY_PASS", Some("")),
         ],
         async {
-            let provider = EnvUsernamePasswordProvider::new(
-                "UP_TEST_EMPTY_PASS_USER",
-                "UP_TEST_EMPTY_PASS",
-            );
+            let provider =
+                EnvUsernamePasswordProvider::new("UP_TEST_EMPTY_PASS_USER", "UP_TEST_EMPTY_PASS");
             let result = provider.get().await;
             assert_configuration_error!(result, "UP_TEST_EMPTY_PASS");
         },
@@ -191,13 +182,10 @@ async fn up_rereads_env_var_on_every_call() {
             assert_eq!(first.password.expose_secret(), "secret1");
 
             // Mutate the password variable and call again.
-            temp_env::async_with_vars(
-                [("UP_TEST_REREAD_PASS", Some("secret2"))],
-                async {
-                    let second = provider.get().await.expect("second call should succeed");
-                    assert_eq!(second.password.expose_secret(), "secret2");
-                },
-            )
+            temp_env::async_with_vars([("UP_TEST_REREAD_PASS", Some("secret2"))], async {
+                let second = provider.get().await.expect("second call should succeed");
+                assert_eq!(second.password.expose_secret(), "secret2");
+            })
             .await;
         },
     )
@@ -232,9 +220,11 @@ async fn up_whitespace_only_username_passes_through() {
             ("UP_TEST_WS_PASS", Some("pw")),
         ],
         async {
-            let provider =
-                EnvUsernamePasswordProvider::new("UP_TEST_WS_USER", "UP_TEST_WS_PASS");
-            let cred = provider.get().await.expect("whitespace should not be rejected");
+            let provider = EnvUsernamePasswordProvider::new("UP_TEST_WS_USER", "UP_TEST_WS_PASS");
+            let cred = provider
+                .get()
+                .await
+                .expect("whitespace should not be rejected");
             assert_eq!(cred.username, "   ");
         },
     )
@@ -250,11 +240,12 @@ async fn up_whitespace_only_password_passes_through() {
             ("UP_TEST_WS_PASS_VAL", Some("   ")),
         ],
         async {
-            let provider = EnvUsernamePasswordProvider::new(
-                "UP_TEST_WS_PASS_USER",
-                "UP_TEST_WS_PASS_VAL",
-            );
-            let cred = provider.get().await.expect("whitespace should not be rejected");
+            let provider =
+                EnvUsernamePasswordProvider::new("UP_TEST_WS_PASS_USER", "UP_TEST_WS_PASS_VAL");
+            let cred = provider
+                .get()
+                .await
+                .expect("whitespace should not be rejected");
             assert_eq!(cred.password.expose_secret(), "   ");
         },
     )
@@ -268,34 +259,28 @@ async fn up_whitespace_only_password_passes_through() {
 /// A-ENV-HMAC-1: hex-encoded value → decoded bytes match expected.
 #[tokio::test]
 async fn hmac_hex_lowercase_decodes_correctly() {
-    temp_env::async_with_vars(
-        [("HMAC_TEST_HEX_LC", Some("deadbeef"))],
-        async {
-            let provider = EnvHmacSecretProvider::new("HMAC_TEST_HEX_LC");
-            let cred = provider.get().await.expect("hex should decode");
-            assert_eq!(
-                cred.key.expose_secret().as_slice(),
-                &[0xDE, 0xAD, 0xBE, 0xEF]
-            );
-        },
-    )
+    temp_env::async_with_vars([("HMAC_TEST_HEX_LC", Some("deadbeef"))], async {
+        let provider = EnvHmacSecretProvider::new("HMAC_TEST_HEX_LC");
+        let cred = provider.get().await.expect("hex should decode");
+        assert_eq!(
+            cred.key.expose_secret().as_slice(),
+            &[0xDE, 0xAD, 0xBE, 0xEF]
+        );
+    })
     .await;
 }
 
 /// A-ENV-HMAC-1: uppercase hex also decodes correctly.
 #[tokio::test]
 async fn hmac_hex_uppercase_decodes_correctly() {
-    temp_env::async_with_vars(
-        [("HMAC_TEST_HEX_UC", Some("DEADBEEF"))],
-        async {
-            let provider = EnvHmacSecretProvider::new("HMAC_TEST_HEX_UC");
-            let cred = provider.get().await.expect("uppercase hex should decode");
-            assert_eq!(
-                cred.key.expose_secret().as_slice(),
-                &[0xDE, 0xAD, 0xBE, 0xEF]
-            );
-        },
-    )
+    temp_env::async_with_vars([("HMAC_TEST_HEX_UC", Some("DEADBEEF"))], async {
+        let provider = EnvHmacSecretProvider::new("HMAC_TEST_HEX_UC");
+        let cred = provider.get().await.expect("uppercase hex should decode");
+        assert_eq!(
+            cred.key.expose_secret().as_slice(),
+            &[0xDE, 0xAD, 0xBE, 0xEF]
+        );
+    })
     .await;
 }
 
@@ -303,17 +288,14 @@ async fn hmac_hex_uppercase_decodes_correctly() {
 /// "3q2+7w==" is standard base64 for [0xDE, 0xAD, 0xBE, 0xEF].
 #[tokio::test]
 async fn hmac_base64_decodes_correctly() {
-    temp_env::async_with_vars(
-        [("HMAC_TEST_B64", Some("3q2+7w=="))],
-        async {
-            let provider = EnvHmacSecretProvider::new("HMAC_TEST_B64");
-            let cred = provider.get().await.expect("base64 should decode");
-            assert_eq!(
-                cred.key.expose_secret().as_slice(),
-                &[0xDE, 0xAD, 0xBE, 0xEF]
-            );
-        },
-    )
+    temp_env::async_with_vars([("HMAC_TEST_B64", Some("3q2+7w=="))], async {
+        let provider = EnvHmacSecretProvider::new("HMAC_TEST_B64");
+        let cred = provider.get().await.expect("base64 should decode");
+        assert_eq!(
+            cred.key.expose_secret().as_slice(),
+            &[0xDE, 0xAD, 0xBE, 0xEF]
+        );
+    })
     .await;
 }
 
@@ -322,47 +304,38 @@ async fn hmac_base64_decodes_correctly() {
 /// 6-byte base64 decode.
 #[tokio::test]
 async fn hmac_hex_wins_for_ambiguous_value() {
-    temp_env::async_with_vars(
-        [("HMAC_TEST_AMBIG", Some("deadbeef"))],
-        async {
-            let provider = EnvHmacSecretProvider::new("HMAC_TEST_AMBIG");
-            let cred = provider.get().await.expect("should succeed");
-            // hex decode → 4 bytes
-            assert_eq!(cred.key.expose_secret().len(), 4);
-            assert_eq!(
-                cred.key.expose_secret().as_slice(),
-                &[0xDE, 0xAD, 0xBE, 0xEF]
-            );
-        },
-    )
+    temp_env::async_with_vars([("HMAC_TEST_AMBIG", Some("deadbeef"))], async {
+        let provider = EnvHmacSecretProvider::new("HMAC_TEST_AMBIG");
+        let cred = provider.get().await.expect("should succeed");
+        // hex decode → 4 bytes
+        assert_eq!(cred.key.expose_secret().len(), 4);
+        assert_eq!(
+            cred.key.expose_secret().as_slice(),
+            &[0xDE, 0xAD, 0xBE, 0xEF]
+        );
+    })
     .await;
 }
 
 /// A-ENV-HMAC-3: missing variable → Configuration error.
 #[tokio::test]
 async fn hmac_missing_var_returns_configuration_error() {
-    temp_env::async_with_vars(
-        [("HMAC_TEST_MISSING", None::<&str>)],
-        async {
-            let provider = EnvHmacSecretProvider::new("HMAC_TEST_MISSING");
-            let result = provider.get().await;
-            assert_configuration_error!(result, "HMAC_TEST_MISSING");
-        },
-    )
+    temp_env::async_with_vars([("HMAC_TEST_MISSING", None::<&str>)], async {
+        let provider = EnvHmacSecretProvider::new("HMAC_TEST_MISSING");
+        let result = provider.get().await;
+        assert_configuration_error!(result, "HMAC_TEST_MISSING");
+    })
     .await;
 }
 
 /// A-ENV-HMAC-4: empty variable → Configuration error.
 #[tokio::test]
 async fn hmac_empty_var_returns_configuration_error() {
-    temp_env::async_with_vars(
-        [("HMAC_TEST_EMPTY", Some(""))],
-        async {
-            let provider = EnvHmacSecretProvider::new("HMAC_TEST_EMPTY");
-            let result = provider.get().await;
-            assert_configuration_error!(result, "HMAC_TEST_EMPTY");
-        },
-    )
+    temp_env::async_with_vars([("HMAC_TEST_EMPTY", Some(""))], async {
+        let provider = EnvHmacSecretProvider::new("HMAC_TEST_EMPTY");
+        let result = provider.get().await;
+        assert_configuration_error!(result, "HMAC_TEST_EMPTY");
+    })
     .await;
 }
 
@@ -384,42 +357,36 @@ async fn hmac_invalid_encoding_returns_configuration_error_with_var_name() {
 /// Edge case: HmacSecret has no expiry and is always valid.
 #[tokio::test]
 async fn hmac_credential_has_no_expiry_and_is_valid() {
-    temp_env::async_with_vars(
-        [("HMAC_TEST_EXPIRY", Some("deadbeef"))],
-        async {
-            let provider = EnvHmacSecretProvider::new("HMAC_TEST_EXPIRY");
-            let cred = provider.get().await.expect("should succeed");
-            assert!(cred.expires_at().is_none(), "expires_at should be None");
-            assert!(cred.is_valid(), "is_valid should be true");
-        },
-    )
+    temp_env::async_with_vars([("HMAC_TEST_EXPIRY", Some("deadbeef"))], async {
+        let provider = EnvHmacSecretProvider::new("HMAC_TEST_EXPIRY");
+        let cred = provider.get().await.expect("should succeed");
+        assert!(cred.expires_at().is_none(), "expires_at should be None");
+        assert!(cred.is_valid(), "is_valid should be true");
+    })
     .await;
 }
 
 /// Edge case: re-reads on every call — change var between two `get()` calls.
 #[tokio::test]
 async fn hmac_rereads_env_var_on_every_call() {
-    temp_env::async_with_vars(
-        [("HMAC_TEST_REREAD", Some("deadbeef"))],
-        async {
-            let provider = EnvHmacSecretProvider::new("HMAC_TEST_REREAD");
-            let first = provider.get().await.expect("first call should succeed");
-            assert_eq!(first.key.expose_secret().as_slice(), &[0xDE, 0xAD, 0xBE, 0xEF]);
+    temp_env::async_with_vars([("HMAC_TEST_REREAD", Some("deadbeef"))], async {
+        let provider = EnvHmacSecretProvider::new("HMAC_TEST_REREAD");
+        let first = provider.get().await.expect("first call should succeed");
+        assert_eq!(
+            first.key.expose_secret().as_slice(),
+            &[0xDE, 0xAD, 0xBE, 0xEF]
+        );
 
-            // Change to a different hex value.
-            temp_env::async_with_vars(
-                [("HMAC_TEST_REREAD", Some("cafebabe"))],
-                async {
-                    let second = provider.get().await.expect("second call should succeed");
-                    assert_eq!(
-                        second.key.expose_secret().as_slice(),
-                        &[0xCA, 0xFE, 0xBA, 0xBE]
-                    );
-                },
-            )
-            .await;
-        },
-    )
+        // Change to a different hex value.
+        temp_env::async_with_vars([("HMAC_TEST_REREAD", Some("cafebabe"))], async {
+            let second = provider.get().await.expect("second call should succeed");
+            assert_eq!(
+                second.key.expose_secret().as_slice(),
+                &[0xCA, 0xFE, 0xBA, 0xBE]
+            );
+        })
+        .await;
+    })
     .await;
 }
 
@@ -430,14 +397,11 @@ async fn hmac_rereads_env_var_on_every_call() {
 /// A-ENV-BT-1: variable set → correct token value returned.
 #[tokio::test]
 async fn bt_happy_path_returns_correct_token() {
-    temp_env::async_with_vars(
-        [("BT_TEST_TOKEN_1", Some("my-api-token"))],
-        async {
-            let provider = EnvBearerTokenProvider::new("BT_TEST_TOKEN_1");
-            let cred = provider.get().await.expect("should succeed");
-            assert_eq!(cred.token.expose_secret(), "my-api-token");
-        },
-    )
+    temp_env::async_with_vars([("BT_TEST_TOKEN_1", Some("my-api-token"))], async {
+        let provider = EnvBearerTokenProvider::new("BT_TEST_TOKEN_1");
+        let cred = provider.get().await.expect("should succeed");
+        assert_eq!(cred.token.expose_secret(), "my-api-token");
+    })
     .await;
 }
 
@@ -449,10 +413,7 @@ async fn bt_token_field_matches_env_var() {
         async {
             let provider = EnvBearerTokenProvider::new("BT_TEST_TOKEN_2");
             let cred = provider.get().await.expect("should succeed");
-            assert_eq!(
-                cred.token.expose_secret(),
-                "Bearer eyJhbGciOiJSUzI1NiJ9"
-            );
+            assert_eq!(cred.token.expose_secret(), "Bearer eyJhbGciOiJSUzI1NiJ9");
         },
     )
     .await;
@@ -461,80 +422,65 @@ async fn bt_token_field_matches_env_var() {
 /// A-ENV-BT-2: missing variable → Configuration error containing var name.
 #[tokio::test]
 async fn bt_missing_var_returns_configuration_error() {
-    temp_env::async_with_vars(
-        [("BT_TEST_MISSING", None::<&str>)],
-        async {
-            let provider = EnvBearerTokenProvider::new("BT_TEST_MISSING");
-            let result = provider.get().await;
-            assert_configuration_error!(result, "BT_TEST_MISSING");
-        },
-    )
+    temp_env::async_with_vars([("BT_TEST_MISSING", None::<&str>)], async {
+        let provider = EnvBearerTokenProvider::new("BT_TEST_MISSING");
+        let result = provider.get().await;
+        assert_configuration_error!(result, "BT_TEST_MISSING");
+    })
     .await;
 }
 
 /// A-ENV-BT-3: empty variable → Configuration error.
 #[tokio::test]
 async fn bt_empty_var_returns_configuration_error() {
-    temp_env::async_with_vars(
-        [("BT_TEST_EMPTY", Some(""))],
-        async {
-            let provider = EnvBearerTokenProvider::new("BT_TEST_EMPTY");
-            let result = provider.get().await;
-            assert_configuration_error!(result, "BT_TEST_EMPTY");
-        },
-    )
+    temp_env::async_with_vars([("BT_TEST_EMPTY", Some(""))], async {
+        let provider = EnvBearerTokenProvider::new("BT_TEST_EMPTY");
+        let result = provider.get().await;
+        assert_configuration_error!(result, "BT_TEST_EMPTY");
+    })
     .await;
 }
 
 /// Edge case: whitespace-only token passes through (not treated as empty).
 #[tokio::test]
 async fn bt_whitespace_only_token_passes_through() {
-    temp_env::async_with_vars(
-        [("BT_TEST_WS", Some("   "))],
-        async {
-            let provider = EnvBearerTokenProvider::new("BT_TEST_WS");
-            let cred = provider.get().await.expect("whitespace should not be rejected");
-            assert_eq!(cred.token.expose_secret(), "   ");
-        },
-    )
+    temp_env::async_with_vars([("BT_TEST_WS", Some("   "))], async {
+        let provider = EnvBearerTokenProvider::new("BT_TEST_WS");
+        let cred = provider
+            .get()
+            .await
+            .expect("whitespace should not be rejected");
+        assert_eq!(cred.token.expose_secret(), "   ");
+    })
     .await;
 }
 
 /// Edge case: BearerToken has no expiry and is valid.
 #[tokio::test]
 async fn bt_credential_has_no_expiry_and_is_valid() {
-    temp_env::async_with_vars(
-        [("BT_TEST_EXPIRY", Some("tok"))],
-        async {
-            let provider = EnvBearerTokenProvider::new("BT_TEST_EXPIRY");
-            let cred = provider.get().await.expect("should succeed");
-            assert!(cred.expires_at().is_none(), "expires_at should be None");
-            assert!(cred.is_valid(), "is_valid should be true");
-        },
-    )
+    temp_env::async_with_vars([("BT_TEST_EXPIRY", Some("tok"))], async {
+        let provider = EnvBearerTokenProvider::new("BT_TEST_EXPIRY");
+        let cred = provider.get().await.expect("should succeed");
+        assert!(cred.expires_at().is_none(), "expires_at should be None");
+        assert!(cred.is_valid(), "is_valid should be true");
+    })
     .await;
 }
 
 /// Edge case: re-reads on every call — change var between two `get()` calls.
 #[tokio::test]
 async fn bt_rereads_env_var_on_every_call() {
-    temp_env::async_with_vars(
-        [("BT_TEST_REREAD", Some("token-v1"))],
-        async {
-            let provider = EnvBearerTokenProvider::new("BT_TEST_REREAD");
-            let first = provider.get().await.expect("first call should succeed");
-            assert_eq!(first.token.expose_secret(), "token-v1");
+    temp_env::async_with_vars([("BT_TEST_REREAD", Some("token-v1"))], async {
+        let provider = EnvBearerTokenProvider::new("BT_TEST_REREAD");
+        let first = provider.get().await.expect("first call should succeed");
+        assert_eq!(first.token.expose_secret(), "token-v1");
 
-            temp_env::async_with_vars(
-                [("BT_TEST_REREAD", Some("token-v2"))],
-                async {
-                    let second = provider.get().await.expect("second call should succeed");
-                    assert_eq!(second.token.expose_secret(), "token-v2");
-                },
-            )
-            .await;
-        },
-    )
+        temp_env::async_with_vars([("BT_TEST_REREAD", Some("token-v2"))], async {
+            let second = provider.get().await.expect("second call should succeed");
+            assert_eq!(second.token.expose_secret(), "token-v2");
+        })
+        .await;
+    })
     .await;
 }
 
@@ -549,13 +495,9 @@ async fn bt_rereads_env_var_on_every_call() {
 #[tokio::test]
 async fn up_missing_var_error_message_starts_with_missing_env_var() {
     temp_env::async_with_vars(
-        [
-            ("UP_GAP1_USER", None::<&str>),
-            ("UP_GAP1_PASS", Some("pw")),
-        ],
+        [("UP_GAP1_USER", None::<&str>), ("UP_GAP1_PASS", Some("pw"))],
         async {
-            let provider =
-                EnvUsernamePasswordProvider::new("UP_GAP1_USER", "UP_GAP1_PASS");
+            let provider = EnvUsernamePasswordProvider::new("UP_GAP1_USER", "UP_GAP1_PASS");
             let result = provider.get().await;
             match result {
                 Err(credential_provider_core::CredentialError::Configuration(msg)) => {
@@ -578,26 +520,23 @@ async fn up_missing_var_error_message_starts_with_missing_env_var() {
 /// GAP-1 (HMAC): absent var error message starts with "missing env var: ".
 #[tokio::test]
 async fn hmac_missing_var_error_message_starts_with_missing_env_var() {
-    temp_env::async_with_vars(
-        [("HMAC_GAP1_SECRET", None::<&str>)],
-        async {
-            let provider = EnvHmacSecretProvider::new("HMAC_GAP1_SECRET");
-            let result = provider.get().await;
-            match result {
-                Err(credential_provider_core::CredentialError::Configuration(msg)) => {
-                    assert!(
-                        msg.starts_with("missing env var: "),
-                        "expected message to start with 'missing env var: ', got: {msg:?}"
-                    );
-                    assert!(msg.contains("HMAC_GAP1_SECRET"));
-                }
-                other => panic!(
-                    "expected Err(Configuration(..)), got {:?}",
-                    other.map(|_| "<Ok>")
-                ),
+    temp_env::async_with_vars([("HMAC_GAP1_SECRET", None::<&str>)], async {
+        let provider = EnvHmacSecretProvider::new("HMAC_GAP1_SECRET");
+        let result = provider.get().await;
+        match result {
+            Err(credential_provider_core::CredentialError::Configuration(msg)) => {
+                assert!(
+                    msg.starts_with("missing env var: "),
+                    "expected message to start with 'missing env var: ', got: {msg:?}"
+                );
+                assert!(msg.contains("HMAC_GAP1_SECRET"));
             }
-        },
-    )
+            other => panic!(
+                "expected Err(Configuration(..)), got {:?}",
+                other.map(|_| "<Ok>")
+            ),
+        }
+    })
     .await;
 }
 
@@ -693,8 +632,7 @@ async fn up_both_absent_error_names_username_var_not_password_var() {
 /// GAP-4 (UP): provider constructed before vars set — second call picks up the vars.
 #[tokio::test]
 async fn up_provider_constructed_before_vars_set_rereads_on_get() {
-    let provider =
-        EnvUsernamePasswordProvider::new("UP_GAP4_USER", "UP_GAP4_PASS");
+    let provider = EnvUsernamePasswordProvider::new("UP_GAP4_USER", "UP_GAP4_PASS");
 
     // First call: vars not set → expect Configuration error.
     let first_result = temp_env::async_with_vars(
@@ -734,10 +672,9 @@ async fn hmac_provider_constructed_before_var_set_rereads_on_get() {
     let provider = EnvHmacSecretProvider::new("HMAC_GAP4_SECRET");
 
     // First call: var not set → expect Configuration error.
-    let first_result = temp_env::async_with_vars(
-        [("HMAC_GAP4_SECRET", None::<&str>)],
-        async { provider.get().await },
-    )
+    let first_result = temp_env::async_with_vars([("HMAC_GAP4_SECRET", None::<&str>)], async {
+        provider.get().await
+    })
     .await;
     assert!(
         matches!(
@@ -748,11 +685,11 @@ async fn hmac_provider_constructed_before_var_set_rereads_on_get() {
     );
 
     // Second call: var now set → expect success.
-    let second_result = temp_env::async_with_vars(
-        [("HMAC_GAP4_SECRET", Some("deadbeef"))],
-        async { provider.get().await },
-    )
-    .await;
+    let second_result =
+        temp_env::async_with_vars([("HMAC_GAP4_SECRET", Some("deadbeef"))], async {
+            provider.get().await
+        })
+        .await;
     let cred = second_result.expect("second call with var set must succeed");
     assert_eq!(
         cred.key.expose_secret().as_slice(),
@@ -766,10 +703,9 @@ async fn bt_provider_constructed_before_var_set_rereads_on_get() {
     let provider = EnvBearerTokenProvider::new("BT_GAP4_TOKEN");
 
     // First call: var not set → expect Configuration error.
-    let first_result = temp_env::async_with_vars(
-        [("BT_GAP4_TOKEN", None::<&str>)],
-        async { provider.get().await },
-    )
+    let first_result = temp_env::async_with_vars([("BT_GAP4_TOKEN", None::<&str>)], async {
+        provider.get().await
+    })
     .await;
     assert!(
         matches!(
@@ -780,10 +716,9 @@ async fn bt_provider_constructed_before_var_set_rereads_on_get() {
     );
 
     // Second call: var now set → expect success.
-    let second_result = temp_env::async_with_vars(
-        [("BT_GAP4_TOKEN", Some("my-token"))],
-        async { provider.get().await },
-    )
+    let second_result = temp_env::async_with_vars([("BT_GAP4_TOKEN", Some("my-token"))], async {
+        provider.get().await
+    })
     .await;
     let cred = second_result.expect("second call with var set must succeed");
     assert_eq!(cred.token.expose_secret(), "my-token");
@@ -806,19 +741,27 @@ async fn up_non_utf8_username_returns_configuration_error_with_utf8_message() {
     let var_name = "UP_GAP6_NON_UTF8_USER";
     let non_utf8 = OsStr::from_bytes(&[0xFF, 0xFE]);
 
+    // RAII guard ensures the variable is removed even if the test panics.
+    struct RemoveVarGuard(&'static str);
+    impl Drop for RemoveVarGuard {
+        fn drop(&mut self) {
+            // Safety: symmetric counterpart of the set_var below; only ever
+            // removes the specific var this test owns.
+            unsafe { std::env::remove_var(self.0) };
+        }
+    }
+
     // temp_env does not accept OsStr values, so set/remove manually.
     // Safety: single-threaded test; temp_env's mutex serialises concurrent env
     // mutations so no other test races with this unsafe block.
     unsafe { std::env::set_var(var_name, non_utf8) };
+    let _guard = RemoveVarGuard(var_name);
 
     let provider = EnvUsernamePasswordProvider::new(var_name, "UP_GAP6_PASS");
-    let result = temp_env::async_with_vars(
-        [("UP_GAP6_PASS", Some("pw"))],
-        async { provider.get().await },
-    )
+    let result = temp_env::async_with_vars([("UP_GAP6_PASS", Some("pw"))], async {
+        provider.get().await
+    })
     .await;
-
-    unsafe { std::env::remove_var(var_name) };
 
     match result {
         Err(credential_provider_core::CredentialError::Configuration(msg)) => {
