@@ -409,11 +409,14 @@ async fn bt_happy_path_returns_correct_token() {
 #[tokio::test]
 async fn bt_token_field_matches_env_var() {
     temp_env::async_with_vars(
-        [("BT_TEST_TOKEN_2", Some("Bearer eyJhbGciOiJSUzI1NiJ9"))],
+        [("BT_TEST_TOKEN_2", Some("Bearer test-token-for-unit-test"))],
         async {
             let provider = EnvBearerTokenProvider::new("BT_TEST_TOKEN_2");
             let cred = provider.get().await.expect("should succeed");
-            assert_eq!(cred.token.expose_secret(), "Bearer eyJhbGciOiJSUzI1NiJ9");
+            assert_eq!(
+                cred.token.expose_secret(),
+                "Bearer test-token-for-unit-test"
+            );
         },
     )
     .await;
