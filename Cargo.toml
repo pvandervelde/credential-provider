@@ -17,6 +17,13 @@ secrecy   = { version = "0.8", features = ["serde"] }
 thiserror = "1"
 tokio     = { version = "1", features = ["sync", "time"] }
 
+# Encoding — used by env feature for HMAC key decoding
+hex    = "0.4"
+base64 = "0.22"
+
+# Test utilities — async_closure feature enables async_with_vars
+temp-env = { version = "0.3", features = ["async_closure"] }
+
 # Vault backend — mark optional = true in member Cargo.toml
 vaultrs = { version = "0.8", default-features = false, features = ["rustls"] }
 
