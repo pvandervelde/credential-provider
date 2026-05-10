@@ -263,3 +263,27 @@ impl<C: Credential> CredentialProvider<C> for VaultProvider<C> {
         Box::pin(async move { unimplemented!("See docs/spec/interfaces/vault-adapter.md") })
     }
 }
+
+// ---------------------------------------------------------------------------
+// Error mapping — translates vaultrs errors to CredentialError
+// ---------------------------------------------------------------------------
+
+/// Maps a [`vaultrs::error::ClientError`] to a [`CredentialError`] using the
+/// vault error classification table from the spec.
+///
+/// `mount` and `path` are included in the [`CredentialError::Configuration`]
+/// message produced for 404 responses so that operators can identify the
+/// misconfigured path.
+///
+/// See: docs/spec/interfaces/vault-adapter.md — Error Mapping
+pub(crate) fn map_vaultrs_error(
+    error: vaultrs::error::ClientError,
+    mount: &str,
+    path: &str,
+) -> CredentialError {
+    unimplemented!("See docs/spec/interfaces/vault-adapter.md — Error Mapping table")
+}
+
+#[cfg(test)]
+#[path = "vault_tests.rs"]
+mod tests;
