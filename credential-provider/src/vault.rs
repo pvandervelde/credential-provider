@@ -2,7 +2,6 @@
 //
 // This module is gated behind the `vault` feature flag.
 // It requires the `vaultrs` crate with the `rustls` feature.
-#![allow(dead_code, unused_variables)]
 
 use std::sync::Arc;
 
@@ -260,7 +259,20 @@ impl VaultProvider<TlsClientCertificate> {
 
 impl<C: Credential> CredentialProvider<C> for VaultProvider<C> {
     fn get(&self) -> BoxFuture<'_, Result<C, CredentialError>> {
-        Box::pin(async move { unimplemented!("See docs/spec/interfaces/vault-adapter.md") })
+        Box::pin(async move {
+            let response =
+                vaultrs::kv1::get_raw(&*self.client, &self.mount, &self.path)
+                    .await
+                    .map_err(|err| map_vaultrs_error(err, &self.mount, &self.path))?;
+
+            let lease_duration = if response.lease_duration > 0 {
+                Some(response.lease_duration as u64)
+            } else {
+                None
+            };
+
+            self.extractor.extract(&response.data, lease_duration)
+        })
     }
 }
 
@@ -276,12 +288,57 @@ impl<C: Credential> CredentialProvider<C> for VaultProvider<C> {
 /// misconfigured path.
 ///
 /// See: docs/spec/interfaces/vault-adapter.md — Error Mapping
+/// Returns `true` if any error in the `std::error::Error` source chain contains
+/// TLS-related keywords (case-insensitive).
+fn tls_in_error_chain(err: &dyn std::error::Error) -> bool {
+    let mut current: Option<&dyn std::error::Error> = Some(err);
+    while let Some(e) = current {
+        let msg = e.to_string().to_lowercase();
+        if msg.contains("tls") || msg.contains("handshake") || msg.contains("certificate") {
+            return true;
+        }
+        current = e.source();
+    }
+    false
+}
+
 pub(crate) fn map_vaultrs_error(
     error: vaultrs::error::ClientError,
     mount: &str,
     path: &str,
 ) -> CredentialError {
-    unimplemented!("See docs/spec/interfaces/vault-adapter.md — Error Mapping table")
+    use vaultrs::error::ClientError as VaultrsError;
+
+    match error {
+        VaultrsError::APIError { code, errors } => match code {
+            403 => CredentialError::Backend("permission denied".to_string()),
+            404 => CredentialError::Configuration(format!(
+                "role or path not found: {mount}/{path}"
+            )),
+            400 if errors.iter().any(|e| e.to_lowercase().contains("lease")) => {
+                CredentialError::Revoked
+            }
+            c if c >= 500 => CredentialError::Backend(format!(
+                "vault server error: {c} {}",
+                errors.join(", ")
+            )),
+            c => CredentialError::Backend(format!("vault error: {c} {}", errors.join(", "))),
+        },
+        VaultrsError::RestClientError { source } => {
+            if tls_in_error_chain(&source) {
+                CredentialError::Unreachable(format!("TLS error: {source}"))
+            } else {
+                CredentialError::Unreachable(source.to_string())
+            }
+        }
+        VaultrsError::ResponseDataEmptyError => {
+            CredentialError::Backend("unexpected response: missing data field".to_string())
+        }
+        VaultrsError::JsonParseError { source } => {
+            CredentialError::Backend(format!("unexpected response: {source}"))
+        }
+        other => CredentialError::Backend(format!("vault error: {other}")),
+    }
 }
 
 #[cfg(test)]
