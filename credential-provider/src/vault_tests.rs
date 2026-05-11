@@ -30,10 +30,13 @@ fn api_error(code: u16, errors: Vec<&str>) -> VaultrsError {
     }
 }
 
-/// Construct a vaultrs RestClientError wrapping a rustify RequestError whose
-/// anyhow source message contains TLS-related keywords ("tls handshake").
-fn tls_rest_error() -> VaultrsError {
-    let inner = anyhow::anyhow!("tls handshake failure: certificate verify failed");
+/// Build a `VaultrsError::RestClientError` wrapping a `rustify` `RequestError`
+/// whose `anyhow` source carries `message`.
+///
+/// Shared by `tls_rest_error()` and `connection_refused_error()` to avoid
+/// repeating the identical seven-line constructor block.
+fn rest_client_error(message: &str) -> VaultrsError {
+    let inner = anyhow::anyhow!("{}", message);
     let rustify_err = rustify::errors::ClientError::RequestError {
         source: inner,
         url: "https://vault.example.com:8200/v1/secret/data/test".to_string(),
@@ -44,18 +47,14 @@ fn tls_rest_error() -> VaultrsError {
     }
 }
 
-/// Construct a vaultrs RestClientError wrapping a rustify RequestError whose
-/// anyhow source message signals a connection failure ("connection refused").
+/// Construct a vaultrs RestClientError whose anyhow source contains TLS-related keywords.
+fn tls_rest_error() -> VaultrsError {
+    rest_client_error("tls handshake failure: certificate verify failed")
+}
+
+/// Construct a vaultrs RestClientError whose anyhow source signals a connection failure.
 fn connection_refused_error() -> VaultrsError {
-    let inner = anyhow::anyhow!("connection refused");
-    let rustify_err = rustify::errors::ClientError::RequestError {
-        source: inner,
-        url: "https://vault.example.com:8200/v1/secret/data/test".to_string(),
-        method: "GET".to_string(),
-    };
-    VaultrsError::RestClientError {
-        source: rustify_err,
-    }
+    rest_client_error("connection refused")
 }
 
 /// Construct a vaultrs JsonParseError using an intentionally invalid JSON string.
