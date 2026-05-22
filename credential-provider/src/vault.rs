@@ -168,9 +168,9 @@ impl VaultProvider<UsernamePassword> {
     /// The returned credential carries `expires_at` derived from Vault's
     /// `lease_duration` field.
     pub fn dynamic_credentials(
-        client: Arc<VaultClient>,
-        mount: impl Into<String>,
-        path: impl Into<String>,
+        _client: Arc<VaultClient>,
+        _mount: impl Into<String>,
+        _path: impl Into<String>,
     ) -> Self {
         unimplemented!(
             "See docs/spec/interfaces/vault-adapter.md — dynamic_credentials constructor"
@@ -189,11 +189,11 @@ impl VaultProvider<UsernamePassword> {
     ///
     /// The returned credential always has `expires_at() == None`.
     pub fn kv2_username_password(
-        client: Arc<VaultClient>,
-        mount: impl Into<String>,
-        key_path: impl Into<String>,
-        username_field: impl Into<String>,
-        password_field: impl Into<String>,
+        _client: Arc<VaultClient>,
+        _mount: impl Into<String>,
+        _key_path: impl Into<String>,
+        _username_field: impl Into<String>,
+        _password_field: impl Into<String>,
     ) -> Self {
         unimplemented!(
             "See docs/spec/interfaces/vault-adapter.md — kv2_username_password constructor"
@@ -213,10 +213,10 @@ impl VaultProvider<HmacSecret> {
     ///
     /// The returned credential always has `expires_at() == None`.
     pub fn kv2_secret(
-        client: Arc<VaultClient>,
-        mount: impl Into<String>,
-        key_path: impl Into<String>,
-        field: impl Into<String>,
+        _client: Arc<VaultClient>,
+        _mount: impl Into<String>,
+        _key_path: impl Into<String>,
+        _field: impl Into<String>,
     ) -> Self {
         unimplemented!("See docs/spec/interfaces/vault-adapter.md — kv2_secret constructor")
     }
@@ -234,10 +234,10 @@ impl VaultProvider<BearerToken> {
     ///
     /// The returned credential always has `expires_at() == None`.
     pub fn kv2_bearer_token(
-        client: Arc<VaultClient>,
-        mount: impl Into<String>,
-        key_path: impl Into<String>,
-        field: impl Into<String>,
+        _client: Arc<VaultClient>,
+        _mount: impl Into<String>,
+        _key_path: impl Into<String>,
+        _field: impl Into<String>,
     ) -> Self {
         unimplemented!("See docs/spec/interfaces/vault-adapter.md — kv2_bearer_token constructor")
     }
@@ -256,9 +256,9 @@ impl VaultProvider<TlsClientCertificate> {
     /// The returned credential carries `expires_at` derived from the
     /// certificate's validity period as reported by Vault.
     pub fn pki_certificate(
-        client: Arc<VaultClient>,
-        mount: impl Into<String>,
-        path: impl Into<String>,
+        _client: Arc<VaultClient>,
+        _mount: impl Into<String>,
+        _path: impl Into<String>,
     ) -> Self {
         unimplemented!("See docs/spec/interfaces/vault-adapter.md — pki_certificate constructor")
     }
@@ -301,14 +301,6 @@ pub(crate) fn lease_secs_from_raw(duration: i32) -> Option<u64> {
     }
 }
 
-/// Maps a [`vaultrs::error::ClientError`] to a [`CredentialError`] using the
-/// vault error classification table from the spec.
-///
-/// `mount` and `path` are included in the [`CredentialError::Configuration`]
-/// message produced for 404 responses so that operators can identify the
-/// misconfigured path.
-///
-/// See: docs/spec/interfaces/vault-adapter.md — Error Mapping
 /// Returns `true` if any error in the `std::error::Error` source chain contains
 /// TLS-related keywords (case-insensitive).
 fn tls_in_error_chain(err: &dyn std::error::Error) -> bool {
@@ -323,6 +315,14 @@ fn tls_in_error_chain(err: &dyn std::error::Error) -> bool {
     false
 }
 
+/// Maps a [`vaultrs::error::ClientError`] to a [`CredentialError`] using the
+/// vault error classification table from the spec.
+///
+/// `mount` and `path` are included in the [`CredentialError::Configuration`]
+/// message produced for 404 responses so that operators can identify the
+/// misconfigured path.
+///
+/// See: docs/spec/interfaces/vault-adapter.md — Error Mapping
 pub(crate) fn map_vaultrs_error(
     error: vaultrs::error::ClientError,
     mount: &str,
