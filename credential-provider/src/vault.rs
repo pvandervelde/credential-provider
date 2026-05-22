@@ -120,6 +120,13 @@ pub trait VaultExtractor<C: Credential>: Send + Sync + 'static {
 ///
 /// See: docs/spec/interfaces/vault-adapter.md
 ///
+/// # Security Note
+///
+/// [`vaultrs::client::VaultClientSettings`] derives `Debug` with a plaintext
+/// `token` field. Do **not** format `VaultClient.settings` with `{:?}` in
+/// production log statements. Store `Arc<VaultClient>` as an opaque handle
+/// and do not access `.settings` inside tracing spans or log macros.
+///
 /// [ADR-004]: docs/adr/ADR-004-external-vault-authentication.md
 pub struct VaultProvider<C: Credential> {
     client: Arc<VaultClient>,
@@ -260,16 +267,17 @@ impl VaultProvider<TlsClientCertificate> {
 impl<C: Credential> CredentialProvider<C> for VaultProvider<C> {
     fn get(&self) -> BoxFuture<'_, Result<C, CredentialError>> {
         Box::pin(async move {
+            // NOTE: This uses the KV v1 read API, which is correct for dynamic secrets
+            // engines (RabbitMQ, database, SSH, AWS, Consul) and for KV v1 mounts.
+            // KV v2 mounts and the PKI engine use different vaultrs APIs; the
+            // kv2_* and pki_certificate convenience constructors (tasks 5.0 and 6.0)
+            // will override this fetch path via a separate strategy.
             let response =
                 vaultrs::kv1::get_raw(&*self.client, &self.mount, &self.path)
                     .await
                     .map_err(|err| map_vaultrs_error(err, &self.mount, &self.path))?;
 
-            let lease_duration = if response.lease_duration > 0 {
-                Some(response.lease_duration as u64)
-            } else {
-                None
-            };
+            let lease_duration = lease_secs_from_raw(response.lease_duration);
 
             self.extractor.extract(&response.data, lease_duration)
         })
@@ -279,6 +287,19 @@ impl<C: Credential> CredentialProvider<C> for VaultProvider<C> {
 // ---------------------------------------------------------------------------
 // Error mapping — translates vaultrs errors to CredentialError
 // ---------------------------------------------------------------------------
+
+/// Converts a raw Vault `lease_duration` (i32 seconds) to `Option<u64>`.
+///
+/// Returns `None` when the duration is zero or negative — Vault uses zero to
+/// indicate a static credential with no lease. Dynamic secrets engines return
+/// a positive value for the lease duration in seconds.
+pub(crate) fn lease_secs_from_raw(duration: i32) -> Option<u64> {
+    if duration > 0 {
+        Some(duration as u64)
+    } else {
+        None
+    }
+}
 
 /// Maps a [`vaultrs::error::ClientError`] to a [`CredentialError`] using the
 /// vault error classification table from the spec.
@@ -337,6 +358,14 @@ pub(crate) fn map_vaultrs_error(
         VaultrsError::JsonParseError { source } => {
             CredentialError::Backend(format!("unexpected response: {source}"))
         }
+        // File-path variants arise from VaultClient::new() (CA cert loading), not from
+        // get_raw(). They cannot be produced by VaultProvider::get() under normal use, but
+        // are handled explicitly to avoid leaking filesystem paths via the catch-all arm.
+        VaultrsError::FileNotFoundError { .. }
+        | VaultrsError::FileReadError { .. }
+        | VaultrsError::ParseCertificateError { .. } => CredentialError::Configuration(
+            "vault client configuration error: invalid CA certificate".to_string(),
+        ),
         other => CredentialError::Backend(format!("vault error: {other}")),
     }
 }

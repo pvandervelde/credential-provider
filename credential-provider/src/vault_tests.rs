@@ -16,7 +16,7 @@ use crate::{CredentialError, UsernamePassword};
 use credential_provider_core::SecretString;
 use vaultrs::error::ClientError as VaultrsError;
 
-use super::{VaultExtractor, map_vaultrs_error};
+use super::{VaultExtractor, lease_secs_from_raw, map_vaultrs_error};
 
 // -------------------------------------------------------------------------
 // Helpers shared across all test submodules
@@ -549,6 +549,170 @@ mod adversarial {
         assert!(
             !matches!(result, CredentialError::Backend(_)),
             "Connection refused must map to Unreachable, not Backend; got {result:?}"
+        );
+    }
+
+    // Mutant kill: tls_in_error_chain — "tls" keyword alone must trigger TLS detection.
+    //
+    // Kills survivor: vault.rs:297:32 replace || with && in tls_in_error_chain
+    // Mutation changes `msg.contains("tls") || msg.contains("handshake") || …`
+    // to `(tls && handshake) || certificate`. An error containing only "tls" (no
+    // "handshake", no "certificate") must still produce Unreachable("TLS error: …").
+    #[test]
+    fn tls_keyword_alone_triggers_tls_prefixed_unreachable() {
+        let error = rest_client_error("tls: failed to establish connection");
+        let result = map_vaultrs_error(error, "secret", "data/test");
+        match result {
+            CredentialError::Unreachable(msg) => {
+                assert!(
+                    msg.starts_with("TLS error:"),
+                    "Expected 'TLS error:' prefix for a message containing only 'tls'; got: {msg}"
+                );
+            }
+            other => panic!("Expected Unreachable for TLS-keyword error, got {other:?}"),
+        }
+    }
+
+    // Mutant kill: tls_in_error_chain — "handshake" keyword alone must trigger TLS detection.
+    //
+    // Kills survivor: vault.rs:297:61 replace || with && in tls_in_error_chain
+    // Second `||` mutated to `&&` gives `tls || (handshake && certificate)`. A message
+    // containing only "handshake" (no "tls", no "certificate") must still be detected.
+    #[test]
+    fn handshake_keyword_alone_triggers_tls_prefixed_unreachable() {
+        let error = rest_client_error("handshake timeout: peer rejected connection");
+        let result = map_vaultrs_error(error, "secret", "data/test");
+        match result {
+            CredentialError::Unreachable(msg) => {
+                assert!(
+                    msg.starts_with("TLS error:"),
+                    "Expected 'TLS error:' prefix for a message containing only 'handshake'; got: {msg}"
+                );
+            }
+            other => panic!("Expected Unreachable for handshake-keyword error, got {other:?}"),
+        }
+    }
+
+    // Mutant kill: tls_in_error_chain — "certificate" keyword alone must trigger TLS detection.
+    //
+    // Also kills survivor: vault.rs:297:61 replace || with && in tls_in_error_chain
+    // An error whose message contains only "certificate" (no "tls", no "handshake")
+    // must still produce Unreachable("TLS error: …").
+    #[test]
+    fn certificate_keyword_alone_triggers_tls_prefixed_unreachable() {
+        let error = rest_client_error("certificate: verification failed");
+        let result = map_vaultrs_error(error, "secret", "data/test");
+        match result {
+            CredentialError::Unreachable(msg) => {
+                assert!(
+                    msg.starts_with("TLS error:"),
+                    "Expected 'TLS error:' prefix for a message containing only 'certificate'; got: {msg}"
+                );
+            }
+            other => panic!("Expected Unreachable for certificate-keyword error, got {other:?}"),
+        }
+    }
+
+    // Mutant kill: tls_in_error_chain returning `true` — non-TLS errors must NOT
+    // carry the "TLS error:" prefix.
+    //
+    // Kills survivor: vault.rs:294:5 replace tls_in_error_chain -> bool with true
+    // If tls_in_error_chain always returns true, ALL RestClientErrors get the
+    // "TLS error: " prefix. A plain connection-refused error must not be so labelled.
+    #[test]
+    fn connection_refused_unreachable_message_has_no_tls_prefix() {
+        let error = connection_refused_error();
+        let result = map_vaultrs_error(error, "secret", "data/test");
+        match result {
+            CredentialError::Unreachable(msg) => {
+                assert!(
+                    !msg.starts_with("TLS error:"),
+                    "Non-TLS error must not carry 'TLS error:' prefix; got: {msg}"
+                );
+            }
+            other => panic!("Expected Unreachable for connection refused, got {other:?}"),
+        }
+    }
+
+    // Mutant kill: >= 500 boundary — 5xx responses must use the "server error" format,
+    // not the catch-all "vault error" format.
+    //
+    // Kills survivor: vault.rs:321:20 replace >= with < in map_vaultrs_error
+    // With `< 500`, codes ≥ 500 fall to the catch-all arm → "vault error: {c} …"
+    // instead of "vault server error: {c} …". The existing Tier 3 test uses `||`
+    // (code OR "server error"), so the code match still passes the mutant. This test
+    // requires "server error" in the message unconditionally.
+    #[test]
+    fn map_error_5xx_backend_message_uses_server_error_format() {
+        let error = api_error(503, vec!["service unavailable"]);
+        let result = map_vaultrs_error(error, "secret", "data/test");
+        match result {
+            CredentialError::Backend(msg) => {
+                assert!(
+                    msg.contains("server error"),
+                    "5xx responses must use 'server error' message format; got: {msg}"
+                );
+            }
+            other => panic!("Expected Backend for HTTP 503, got {other:?}"),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// Mutation kill tests: lease_secs_from_raw
+//
+// These three tests kill the two survivors found by cargo-mutants:
+//
+//   Survivor 1: replace > with <  in lease_secs_from_raw (vault.rs)
+//     Mutation: `duration > 0` → `duration < 0`
+//     Effect:   lease_secs_from_raw(30) returns None instead of Some(30)
+//
+//   Survivor 2: replace > with == in lease_secs_from_raw (vault.rs)
+//     Mutation: `duration > 0` → `duration == 0`
+//     Effect:   lease_secs_from_raw(30) returns None instead of Some(30);
+//               lease_secs_from_raw(0) returns Some(0) instead of None
+//
+// Kill plan:
+//   - `positive_returns_some`   kills both (30 must → Some(30))
+//   - `zero_returns_none`       kills Survivor 2 (0 must → None, not Some(0))
+//   - `negative_returns_none`   kills Survivor 1 (−1 must → None, not Some(18446744073709551615))
+// -------------------------------------------------------------------------
+
+mod lease_secs_kill_tests {
+    use super::*;
+
+    // Kills Survivor 1 and Survivor 2:
+    //   `> to <` makes 30 < 0 = false → None  (should be Some(30))
+    //   `> to ==` makes 30 == 0 = false → None (should be Some(30))
+    #[test]
+    fn positive_lease_duration_returns_some() {
+        assert_eq!(
+            lease_secs_from_raw(30),
+            Some(30u64),
+            "A positive lease_duration must map to Some(duration as u64)"
+        );
+    }
+
+    // Kills Survivor 2:
+    //   `> to ==` makes 0 == 0 = true → Some(0) (should be None)
+    #[test]
+    fn zero_lease_duration_returns_none() {
+        assert_eq!(
+            lease_secs_from_raw(0),
+            None,
+            "A zero lease_duration must map to None (static credential, no expiry)"
+        );
+    }
+
+    // Kills Survivor 1:
+    //   `> to <` makes −1 < 0 = true → Some(u64::MAX via wrapping cast)
+    //   If implemented correctly, −1 returns None.
+    #[test]
+    fn negative_lease_duration_returns_none() {
+        assert_eq!(
+            lease_secs_from_raw(-1),
+            None,
+            "A negative lease_duration must map to None"
         );
     }
 }
