@@ -115,7 +115,7 @@ Maps behavioral assertions to test cases. Updated when new test suites are added
 **Source:** `credential-provider/src/vault_tests.rs` (linked via `#[path]` in `vault.rs`)
 **Criticality:** Domain business logic — Tiers 1 + 2 + 3 required
 **Feature gate:** `vault`
-**Status:** RED phase — tests compile, 19 fail (`map_vaultrs_error` unimplemented), 2 ignored (integration)
+**Status:** GREEN — 66 passing, 0 failing, 2 ignored (integration); mutation score 100% (10/10 viable)
 
 ### Specification Tests (Tier 1 — from assertions.md A-VAULT-*)
 
