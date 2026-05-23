@@ -133,6 +133,14 @@ pub struct VaultProvider<C: Credential> {
     mount: String,
     path: String,
     extractor: Arc<dyn VaultExtractor<C>>,
+    // fetch_strategy is intentionally absent from this task-3.0 implementation.
+    // The current get() uses vaultrs::kv1::get_raw() which covers dynamic secrets
+    // engines (RabbitMQ, database, SSH, Consul, AWS). KV v2 and PKI require
+    // different vaultrs calls. Task 5.0 (KV v2) will extend VaultProvider<C> with a
+    //   fetch_strategy: FetchStrategy   (private enum: Kv1, Kv2, Pki)
+    // field and dispatch on it in get(). Adding the field now without implementing
+    // the branches would be dead code. See docs/spec/interfaces/vault-adapter.md
+    // for the complete constructor design.
 }
 
 impl<C: Credential> VaultProvider<C> {
@@ -269,9 +277,9 @@ impl<C: Credential> CredentialProvider<C> for VaultProvider<C> {
         Box::pin(async move {
             // NOTE: This uses the KV v1 read API, which is correct for dynamic secrets
             // engines (RabbitMQ, database, SSH, AWS, Consul) and for KV v1 mounts.
-            // KV v2 mounts and the PKI engine use different vaultrs APIs; the
-            // kv2_* and pki_certificate convenience constructors (tasks 5.0 and 6.0)
-            // will override this fetch path via a separate strategy.
+            // KV v2 and PKI use different vaultrs APIs. Task 5.0 will add a
+            // `fetch_strategy: FetchStrategy` field to VaultProvider<C> and dispatch
+            // on it here, replacing this unconditional kv1 call.
             let response =
                 vaultrs::kv1::get_raw(&*self.client, &self.mount, &self.path)
                     .await
@@ -307,6 +315,10 @@ fn tls_in_error_chain(err: &dyn std::error::Error) -> bool {
     let mut current: Option<&dyn std::error::Error> = Some(err);
     while let Some(e) = current {
         let msg = e.to_string().to_lowercase();
+        // "tls" and "handshake" are transport-layer specific. "certificate" is
+        // broader but in practice only appears in TLS-stack messages within the
+        // reqwest/rustls error chain; no vaultrs 0.8.x RestClientError variant
+        // produces a non-TLS message containing "certificate".
         if msg.contains("tls") || msg.contains("handshake") || msg.contains("certificate") {
             return true;
         }
@@ -366,6 +378,11 @@ pub(crate) fn map_vaultrs_error(
         | VaultrsError::ParseCertificateError { .. } => CredentialError::Configuration(
             "vault client configuration error: invalid CA certificate".to_string(),
         ),
+        // All known vaultrs 0.8 ClientError variants are matched explicitly above.
+        // This arm catches any variants added in future vaultrs versions. The Display
+        // output of future variants is not under our control; if vaultrs 0.9+ adds a
+        // variant whose Display leaks internal details, this arm will surface them in
+        // CredentialError::Backend messages. Review this arm whenever vaultrs is bumped.
         other => CredentialError::Backend(format!("vault error: {other}")),
     }
 }

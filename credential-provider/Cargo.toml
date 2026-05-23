@@ -57,6 +57,10 @@ credential-provider-core = { path = "../credential-provider-core", features = ["
 temp-env = { workspace = true }
 # Async test runtime
 tokio = { workspace = true, features = ["macros", "rt"] }
-# Vault error construction in tests — needed to build RestClientError variants
-rustify = "0.7"
-anyhow = "1"
+# Vault error construction in tests — needed to build RestClientError variants.
+# Pinned via workspace to stay in sync with the vaultrs 0.8 transitive dependency.
+rustify = { workspace = true }
+anyhow  = { workspace = true }
+# reqwest is vaultrs 0.8's HTTP backend; exposed for constructing ParseCertificateError
+# in unit tests (path-leakage assertion). No network access is exercised.
+reqwest = { workspace = true }

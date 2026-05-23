@@ -716,3 +716,127 @@ mod lease_secs_kill_tests {
         );
     }
 }
+
+// -------------------------------------------------------------------------
+// File-path error variant tests (PR comment #2)
+//
+// FileNotFoundError, FileReadError, and ParseCertificateError arise from
+// VaultClient::new() (CA certificate loading), not from get_raw(). They are
+// handled explicitly in map_vaultrs_error to avoid leaking filesystem paths
+// via the catch-all arm. Three assertions per variant:
+//   (a) maps to CredentialError::Configuration — not Backend or Unreachable
+//   (b) the path value does NOT appear in the output message (no path leakage)
+//   (c) the generic CA-cert message IS present so operators know the cause
+// -------------------------------------------------------------------------
+
+mod file_path_variant_spec {
+    use super::*;
+
+    const SENSITIVE_PATH: &str = "/etc/vault/ca-secret/root.pem";
+
+    /// Build a `reqwest::Error` without network access by giving the HTTP client
+    /// an unparseable URL (unclosed IPv6 bracket). URL parsing is synchronous
+    /// and fails before any network operation.
+    fn reqwest_parse_error() -> reqwest::Error {
+        reqwest::Client::new()
+            .get("http://[invalid-bracket")
+            .build()
+            .expect_err("URL with unclosed bracket must fail to parse")
+    }
+
+    #[test]
+    fn file_not_found_maps_to_configuration_without_path() {
+        let error = VaultrsError::FileNotFoundError {
+            path: SENSITIVE_PATH.to_string(),
+        };
+        let result = map_vaultrs_error(error, "pki", "issue/role");
+        match result {
+            CredentialError::Configuration(msg) => {
+                assert!(
+                    !msg.contains(SENSITIVE_PATH),
+                    "FileNotFoundError must not leak the filesystem path; got: {msg}"
+                );
+                assert!(
+                    msg.to_lowercase().contains("certificate"),
+                    "FileNotFoundError message should mention 'certificate'; got: {msg}"
+                );
+            }
+            other => panic!("Expected Configuration for FileNotFoundError, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn file_read_error_maps_to_configuration_without_path() {
+        let error = VaultrsError::FileReadError {
+            source: std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied"),
+            path: SENSITIVE_PATH.to_string(),
+        };
+        let result = map_vaultrs_error(error, "pki", "issue/role");
+        match result {
+            CredentialError::Configuration(msg) => {
+                assert!(
+                    !msg.contains(SENSITIVE_PATH),
+                    "FileReadError must not leak the filesystem path; got: {msg}"
+                );
+                assert!(
+                    msg.to_lowercase().contains("certificate"),
+                    "FileReadError message should mention 'certificate'; got: {msg}"
+                );
+            }
+            other => panic!("Expected Configuration for FileReadError, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_certificate_error_maps_to_configuration_without_path() {
+        let error = VaultrsError::ParseCertificateError {
+            source: reqwest_parse_error(),
+            path: SENSITIVE_PATH.to_string(),
+        };
+        let result = map_vaultrs_error(error, "pki", "issue/role");
+        match result {
+            CredentialError::Configuration(msg) => {
+                assert!(
+                    !msg.contains(SENSITIVE_PATH),
+                    "ParseCertificateError must not leak the filesystem path; got: {msg}"
+                );
+                assert!(
+                    msg.to_lowercase().contains("certificate"),
+                    "ParseCertificateError message should mention 'certificate'; got: {msg}"
+                );
+            }
+            other => panic!("Expected Configuration for ParseCertificateError, got {other:?}"),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------
+// Catch-all arm test (PR comment #3)
+//
+// The catch-all in map_vaultrs_error handles ClientError variants that are
+// not matched by the explicit arms. In vaultrs 0.8 the only unmatched
+// variants are: ResponseEmptyError, WrapInvalidError, URLParseError,
+// RequestBuildError, RequestError, and any future additions.
+// This test uses ResponseEmptyError as a representative variant.
+// -------------------------------------------------------------------------
+
+mod catch_all_arm_spec {
+    use super::*;
+
+    #[test]
+    fn unrecognised_vaultrs_variant_maps_to_backend() {
+        // ResponseEmptyError is not matched by any explicit arm in
+        // map_vaultrs_error, so it falls through to the catch-all.
+        let error = VaultrsError::ResponseEmptyError;
+        let result = map_vaultrs_error(error, "secret", "data/test");
+        match result {
+            CredentialError::Backend(msg) => {
+                assert!(
+                    msg.starts_with("vault error:"),
+                    "Catch-all arm must produce a 'vault error: …' message; got: {msg}"
+                );
+            }
+            other => panic!("Expected Backend for catch-all variant, got {other:?}"),
+        }
+    }
+}

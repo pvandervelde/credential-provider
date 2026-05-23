@@ -38,6 +38,14 @@ aws-credential-types = { version = "1" }
 # JSON parsing — used by vault feature; mark optional = true in member Cargo.toml
 serde_json = { version = "1" }
 
+# Test helpers for vault error construction — rustify is a transitive dep of vaultrs 0.8;
+# pin to the same minor to ensure test error variants match production types exactly.
+rustify = { version = "0.7", default-features = false }
+anyhow  = { version = "1" }
+# reqwest is vaultrs 0.8's HTTP backend; exposed for constructing ParseCertificateError
+# in unit tests (path-leakage assertion). No network access is exercised in tests.
+reqwest = { version = "0.13", default-features = false }
+
 # Structured logging
 tracing = "0.1"
 
