@@ -280,10 +280,9 @@ impl<C: Credential> CredentialProvider<C> for VaultProvider<C> {
             // KV v2 and PKI use different vaultrs APIs. Task 5.0 will add a
             // `fetch_strategy: FetchStrategy` field to VaultProvider<C> and dispatch
             // on it here, replacing this unconditional kv1 call.
-            let response =
-                vaultrs::kv1::get_raw(&*self.client, &self.mount, &self.path)
-                    .await
-                    .map_err(|err| map_vaultrs_error(err, &self.mount, &self.path))?;
+            let response = vaultrs::kv1::get_raw(&*self.client, &self.mount, &self.path)
+                .await
+                .map_err(|err| map_vaultrs_error(err, &self.mount, &self.path))?;
 
             let lease_duration = lease_secs_from_raw(response.lease_duration);
 
@@ -345,16 +344,15 @@ pub(crate) fn map_vaultrs_error(
     match error {
         VaultrsError::APIError { code, errors } => match code {
             403 => CredentialError::Backend("permission denied".to_string()),
-            404 => CredentialError::Configuration(format!(
-                "role or path not found: {mount}/{path}"
-            )),
+            404 => {
+                CredentialError::Configuration(format!("role or path not found: {mount}/{path}"))
+            }
             400 if errors.iter().any(|e| e.to_lowercase().contains("lease")) => {
                 CredentialError::Revoked
             }
-            c if c >= 500 => CredentialError::Backend(format!(
-                "vault server error: {c} {}",
-                errors.join(", ")
-            )),
+            c if c >= 500 => {
+                CredentialError::Backend(format!("vault server error: {c} {}", errors.join(", ")))
+            }
             c => CredentialError::Backend(format!("vault error: {c} {}", errors.join(", "))),
         },
         VaultrsError::RestClientError { source } => {
