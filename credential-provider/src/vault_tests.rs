@@ -735,7 +735,7 @@ mod file_path_variant_spec {
     const SENSITIVE_PATH: &str = "/etc/vault/ca-secret/root.pem";
 
     /// Build a `reqwest::Error` without network access by giving the HTTP client
-    /// an unparseable URL (unclosed IPv6 bracket). URL parsing is synchronous
+    /// an unparsable URL (unclosed IPv6 bracket). URL parsing is synchronous
     /// and fails before any network operation.
     fn reqwest_parse_error() -> reqwest::Error {
         reqwest::Client::new()
