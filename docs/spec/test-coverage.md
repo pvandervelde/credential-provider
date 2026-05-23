@@ -107,3 +107,68 @@ Maps behavioral assertions to test cases. Updated when new test suites are added
 - **E-CACHE-6 (provider panic)**: not covered — panic propagation through `tokio::sync::RwLock` is a runtime concern; would require a purpose-built panicking mock.
 - **Concurrency on stale cache**: A-CACHE-6 covers an empty cache; serialization on a stale-but-valid cache (Rules 3/4) is not covered by a dedicated concurrency test.
 - **Fuzz concurrency path**: `fuzz_caching.rs` uses `new_current_thread()` and cannot exercise the concurrent thundering-herd path (A-CACHE-6). This is acceptable — A-CACHE-6 is covered by the dedicated unit test.
+
+---
+
+## VaultProvider — Task 3.0: map_vaultrs_error() and VaultExtractor contract
+
+**Source:** `credential-provider/src/vault_tests.rs` (linked via `#[path]` in `vault.rs`)
+**Criticality:** Domain business logic — Tiers 1 + 2 + 3 required
+**Feature gate:** `vault`
+**Status:** GREEN — 66 passing, 0 failing, 2 ignored (integration); mutation score 100% (10/10 viable)
+
+### Specification Tests (Tier 1 — from assertions.md A-VAULT-*)
+
+| Assertion | Test name |
+|---|---|
+| A-VAULT-DYN-2: 403 → Backend("permission denied") | `error_mapping_spec::map_error_403_returns_backend_permission_denied` |
+| A-VAULT-DYN-3: 404 → Configuration with mount and path | `error_mapping_spec::map_error_404_returns_configuration_path_not_found` |
+| A-VAULT-DYN-5: 400 + "lease" → Revoked | `error_mapping_spec::map_error_400_lease_returns_revoked` |
+| HTTP 5xx → Backend with code and detail | `error_mapping_spec::map_error_5xx_returns_backend_server_error` |
+| A-VAULT-DYN-4 (TLS): TLS RestClientError → Unreachable("TLS error: …") | `error_mapping_spec::map_error_tls_returns_unreachable_tls` |
+| A-VAULT-DYN-4 (conn): connection refused → Unreachable | `error_mapping_spec::map_error_connection_refused_returns_unreachable` |
+| A-VAULT-DYN-6: ResponseDataEmptyError → Backend("…missing data field") | `error_mapping_spec::map_error_response_data_empty_returns_backend_missing_data` |
+| A-VAULT-DYN-6: JsonParseError → Backend("unexpected response: …") | `error_mapping_spec::map_error_json_parse_returns_backend_unexpected_response` |
+| A-VAULT-CUSTOM-1: extractor receives full data and lease metadata | `extractor_contract::extractor_receives_correct_data_and_lease_duration` |
+| A-VAULT-CUSTOM-1: extractor receives None when no lease | `extractor_contract::extractor_receives_none_when_no_lease` |
+| A-VAULT-CUSTOM-1: get() returns whatever extractor produces | `extractor_contract::get_returns_whatever_extractor_produces` |
+| A-VAULT-CUSTOM-2: extractor error propagates as CredentialError | `extractor_contract::extractor_error_propagates_as_credential_error` |
+| A-VAULT-CUSTOM-2: extractor error message is preserved verbatim | `extractor_contract::extractor_error_message_is_preserved_verbatim` |
+
+### Adversarial / Boundary Tests (Tier 2)
+
+| Scenario | Test name |
+|---|---|
+| 400 without "lease" keyword → Backend (not Revoked) | `edge_cases::map_error_non_lease_400_returns_backend` |
+| Non-lease 400 is not Revoked (stub-killer) | `edge_cases::map_error_non_lease_400_is_not_revoked` |
+| Unknown 4xx (409) → Backend | `edge_cases::map_error_unknown_4xx_returns_backend` |
+| 404 message contains both mount AND path (stub-killer) | `edge_cases::map_error_404_configuration_message_contains_mount_slash_path` |
+| 403 must not be Configuration (stub-killer) | `edge_cases::map_error_403_is_not_configuration` |
+| Lease 400 must not be Backend (stub-killer) | `edge_cases::map_error_lease_400_is_not_backend` |
+| get() passes None when lease_duration == 0 (integration, `#[ignore]`) | `edge_cases::get_with_zero_lease_duration_passes_none_to_extractor` |
+| get() passes Some(N) when lease_duration == N>0 (integration, `#[ignore]`) | `edge_cases::get_with_positive_lease_duration_passes_some_to_extractor` |
+
+### Property / Adversarial Tests (Tier 3)
+
+| Scenario | Test name |
+|---|---|
+| All 5xx codes (500, 502, 503, 504) → Backend | `adversarial::map_error_all_5xx_codes_return_backend` |
+| 5xx Backend message contains status code | `adversarial::map_error_5xx_backend_message_contains_status_code` |
+| Different 5xx codes → distinct messages | `adversarial::map_error_different_5xx_codes_produce_distinct_messages` |
+| TLS error is not Backend (must be Unreachable) | `adversarial::map_error_tls_is_not_backend` |
+| Connection refused is not Backend (must be Unreachable) | `adversarial::map_error_connection_refused_is_not_backend` |
+
+### Stub-killing strategy
+
+- `map_error_403_is_not_configuration` + `map_error_404_returns_configuration_path_not_found` — together forbid a stub that maps all 4xx → Configuration.
+- `map_error_non_lease_400_is_not_revoked` + `map_error_400_lease_returns_revoked` — together forbid both "always Revoked" and "never Revoked" stubs for 400 errors.
+- `map_error_404_configuration_message_contains_mount_slash_path` — forbids a stub that returns a hardcoded "not found" without embedding the actual mount and path values.
+- `map_error_different_5xx_codes_produce_distinct_messages` — forbids a stub that hardcodes a fixed 5xx message regardless of status code.
+- `map_error_tls_is_not_backend` + `map_error_connection_refused_is_not_backend` — together forbid a stub that maps all RestClientErrors → Backend.
+- `extractor_error_message_is_preserved_verbatim` — forbids a stub that wraps the extractor error in a new Backend message.
+
+### Gaps / Known Limitations
+
+- `get()` lease_duration mapping (tests 13 and 14) is not covered by unit tests — requires an HTTP-level mock or a live Vault instance. Tracked as `#[ignore]` integration test placeholders.
+- `map_vaultrs_error` for `RestClientError` variants other than `RequestError` (e.g., `ServerResponseError`, `ReqwestBuildError`) is not explicitly tested; they fall through to the "any other" → Backend path.
+- Property-based testing with `proptest` across arbitrary API error codes is not included; the Tier 3 tests use a fixed set of representative 5xx codes.

@@ -3,7 +3,7 @@
 **Architectural layer:** Adapters (`credential-provider`)
 **Source file:** `credential-provider/src/vault.rs`
 **Feature flag:** `vault`
-**External dependencies:** `vaultrs 0.7` (rustls feature), `serde_json 1`, `tokio 1`
+**External dependencies:** `vaultrs 0.8` (rustls feature), `serde_json 1`, `tokio 1`
 **ADRs:** [ADR-004](../../adr/ADR-004-external-vault-authentication.md)
 
 The Vault adapter provides a single generic `VaultProvider<C>` that reads from
