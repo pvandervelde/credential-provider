@@ -840,3 +840,438 @@ mod catch_all_arm_spec {
         }
     }
 }
+
+// -------------------------------------------------------------------------
+// DynamicCredentialsExtractor tests
+//
+// Covers A-VAULT-DYN-1 (extractor-level assertions).
+// A-VAULT-DYN-2 through A-VAULT-DYN-6 are already covered by
+// error_mapping_spec above.
+//
+// NOTE: Tests that reference `super::super::DynamicCredentialsExtractor`
+// will NOT COMPILE until DynamicCredentialsExtractor is declared in vault.rs.
+// The constructor test `dynamic_credentials_constructor_does_not_panic`
+// compiles now (VaultProvider::dynamic_credentials already exists) but
+// FAILS at runtime because the function panics with unimplemented!().
+//
+// This is the expected pre-implementation (TDD) state.
+// -------------------------------------------------------------------------
+
+mod dynamic_credentials_extractor {
+    use super::super::DynamicCredentialsExtractor;
+    use super::super::VaultProvider;
+    use super::*;
+    use crate::ExposeSecret;
+    use std::time::{Duration, Instant};
+
+    // Helper: construct a unit-struct extractor (no fields).
+    fn extractor() -> DynamicCredentialsExtractor {
+        DynamicCredentialsExtractor
+    }
+
+    // -----------------------------------------------------------------------
+    // Tier 1 — Specification tests
+    // One test per behavioural clause of A-VAULT-DYN-1 (extractor level).
+    // -----------------------------------------------------------------------
+
+    // A-VAULT-DYN-1 (success path): valid username + password + positive lease → Ok
+    #[test]
+    fn valid_data_with_positive_lease_returns_ok() {
+        let data = serde_json::json!({"username": "alice", "password": "hunter2"});
+        let result = extractor().extract(&data, Some(30));
+        assert!(
+            result.is_ok(),
+            "Valid data with positive lease must return Ok; got {result:?}"
+        );
+    }
+
+    // A-VAULT-DYN-1 (expiry set): positive lease_duration → expires_at is Some
+    #[test]
+    fn valid_data_positive_lease_sets_some_expires_at() {
+        let data = serde_json::json!({"username": "alice", "password": "hunter2"});
+        let result = extractor().extract(&data, Some(30)).unwrap();
+        assert!(
+            result.expires_at.is_some(),
+            "Positive lease_duration must produce Some(expires_at), got None"
+        );
+    }
+
+    // A-VAULT-DYN-1 (zero lease): lease_duration_secs = Some(0) → expires_at is None
+    #[test]
+    fn valid_data_zero_lease_returns_none_expires_at() {
+        let data = serde_json::json!({"username": "alice", "password": "hunter2"});
+        let result = extractor().extract(&data, Some(0)).unwrap();
+        assert!(
+            result.expires_at.is_none(),
+            "Zero lease_duration must produce None expires_at, got Some"
+        );
+    }
+
+    // A-VAULT-DYN-1 (None lease): lease_duration_secs = None → expires_at is None
+    #[test]
+    fn valid_data_none_lease_returns_none_expires_at() {
+        let data = serde_json::json!({"username": "alice", "password": "hunter2"});
+        let result = extractor().extract(&data, None).unwrap();
+        assert!(
+            result.expires_at.is_none(),
+            "None lease_duration must produce None expires_at, got Some"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Tier 2 — Adversarial / Boundary tests
+    // -----------------------------------------------------------------------
+
+    // Missing "username" field → Err(Backend)
+    #[test]
+    fn missing_username_returns_backend_error() {
+        let data = serde_json::json!({"password": "hunter2"});
+        let result = extractor().extract(&data, Some(30));
+        assert!(
+            matches!(result, Err(CredentialError::Backend(_))),
+            "Missing 'username' must return Err(Backend), got {result:?}"
+        );
+    }
+
+    // Missing "password" field → Err(Backend)
+    #[test]
+    fn missing_password_returns_backend_error() {
+        let data = serde_json::json!({"username": "alice"});
+        let result = extractor().extract(&data, Some(30));
+        assert!(
+            matches!(result, Err(CredentialError::Backend(_))),
+            "Missing 'password' must return Err(Backend), got {result:?}"
+        );
+    }
+
+    // Missing username error message must contain the field name "username"
+    #[test]
+    fn missing_username_error_message_contains_field_name() {
+        let data = serde_json::json!({"password": "hunter2"});
+        let result = extractor().extract(&data, None);
+        match result {
+            Err(CredentialError::Backend(msg)) => {
+                assert!(
+                    msg.contains("username"),
+                    "Missing-username Backend message must contain 'username'; got: {msg}"
+                );
+            }
+            other => panic!("Expected Err(Backend), got {other:?}"),
+        }
+    }
+
+    // Missing password error message must contain the field name "password"
+    #[test]
+    fn missing_password_error_message_contains_field_name() {
+        let data = serde_json::json!({"username": "alice"});
+        let result = extractor().extract(&data, None);
+        match result {
+            Err(CredentialError::Backend(msg)) => {
+                assert!(
+                    msg.contains("password"),
+                    "Missing-password Backend message must contain 'password'; got: {msg}"
+                );
+            }
+            other => panic!("Expected Err(Backend), got {other:?}"),
+        }
+    }
+
+    // Username present but as a JSON number → Err(Backend) (type mismatch)
+    #[test]
+    fn username_as_number_returns_backend_error() {
+        let data = serde_json::json!({"username": 42, "password": "hunter2"});
+        let result = extractor().extract(&data, None);
+        assert!(
+            matches!(result, Err(CredentialError::Backend(_))),
+            "Non-string username (number) must return Err(Backend), got {result:?}"
+        );
+    }
+
+    // Password present but as a JSON bool → Err(Backend) (type mismatch)
+    #[test]
+    fn password_as_bool_returns_backend_error() {
+        let data = serde_json::json!({"username": "alice", "password": true});
+        let result = extractor().extract(&data, None);
+        assert!(
+            matches!(result, Err(CredentialError::Backend(_))),
+            "Non-string password (bool) must return Err(Backend), got {result:?}"
+        );
+    }
+
+    // Username present but as JSON null → Err(Backend)
+    #[test]
+    fn username_as_null_returns_backend_error() {
+        let data = serde_json::json!({"username": null, "password": "hunter2"});
+        let result = extractor().extract(&data, None);
+        assert!(
+            matches!(result, Err(CredentialError::Backend(_))),
+            "Null username must return Err(Backend), got {result:?}"
+        );
+    }
+
+    // Username present but as a JSON array → Err(Backend)
+    #[test]
+    fn username_as_array_returns_backend_error() {
+        let data = serde_json::json!({"username": ["alice"], "password": "hunter2"});
+        let result = extractor().extract(&data, None);
+        assert!(
+            matches!(result, Err(CredentialError::Backend(_))),
+            "Array username must return Err(Backend), got {result:?}"
+        );
+    }
+
+    // Stub-killer: extracted username must equal data["username"], not a hardcoded value
+    #[test]
+    fn extracted_username_matches_data_username_field() {
+        let data = serde_json::json!({"username": "bob", "password": "secret"});
+        let result = extractor().extract(&data, None).unwrap();
+        assert_eq!(
+            result.username, "bob",
+            "Extracted username must equal data[\"username\"]"
+        );
+    }
+
+    // Stub-killer: extracted password must equal data["password"], not a hardcoded value
+    #[test]
+    fn extracted_password_matches_data_password_field() {
+        let data = serde_json::json!({"username": "bob", "password": "s3cr3t-p@ss"});
+        let result = extractor().extract(&data, None).unwrap();
+        assert_eq!(
+            result.password.expose_secret().as_str(),
+            "s3cr3t-p@ss",
+            "Extracted password must equal data[\"password\"]"
+        );
+    }
+
+    // Stub-killer: two different data inputs → two different usernames
+    // A stub returning a hardcoded credential would fail this test.
+    #[test]
+    fn different_data_produces_different_extracted_usernames() {
+        let data_a = serde_json::json!({"username": "alice", "password": "pass1"});
+        let data_b = serde_json::json!({"username": "bob", "password": "pass2"});
+        let cred_a = extractor().extract(&data_a, None).unwrap();
+        let cred_b = extractor().extract(&data_b, None).unwrap();
+        assert_ne!(
+            cred_a.username, cred_b.username,
+            "Different input data must produce different usernames (not hardcoded)"
+        );
+    }
+
+    // Stub-killer: two different data inputs → two different passwords
+    #[test]
+    fn different_data_produces_different_extracted_passwords() {
+        let data_a = serde_json::json!({"username": "alice", "password": "password-alpha"});
+        let data_b = serde_json::json!({"username": "bob",   "password": "password-beta"});
+        let cred_a = extractor().extract(&data_a, None).unwrap();
+        let cred_b = extractor().extract(&data_b, None).unwrap();
+        assert_ne!(
+            cred_a.password.expose_secret().as_str(),
+            cred_b.password.expose_secret().as_str(),
+            "Different input data must produce different passwords (not hardcoded)"
+        );
+    }
+
+    // Boundary: lease == 1 (minimum positive value) must still produce Some(expires_at)
+    #[test]
+    fn lease_boundary_one_second_produces_some_expires_at() {
+        let data = serde_json::json!({"username": "alice", "password": "hunter2"});
+        let result = extractor().extract(&data, Some(1)).unwrap();
+        assert!(
+            result.expires_at.is_some(),
+            "Lease of 1 second (minimum positive) must produce Some(expires_at)"
+        );
+    }
+
+    // Stub-killer for expiry computation: expires_at must be approximately now + lease_duration.
+    // A stub returning Some(Instant::now()) without adding the duration fails the lower bound.
+    // A stub returning Some(Instant::now() + Duration::MAX) fails the upper bound.
+    #[test]
+    fn expires_at_is_approximately_now_plus_lease_duration() {
+        let lease_secs = 60u64;
+        let before = Instant::now();
+        let data = serde_json::json!({"username": "alice", "password": "hunter2"});
+        let result = extractor().extract(&data, Some(lease_secs)).unwrap();
+        let after = Instant::now();
+
+        let expires = result
+            .expires_at
+            .expect("Positive lease must set expires_at");
+        let min_expected = before + Duration::from_secs(lease_secs);
+        let max_expected = after + Duration::from_secs(lease_secs);
+
+        assert!(
+            expires >= min_expected,
+            "expires_at must be >= before + lease_duration ({min_expected:?}); got {expires:?}"
+        );
+        assert!(
+            expires <= max_expected,
+            "expires_at must be <= after + lease_duration ({max_expected:?}); got {expires:?}"
+        );
+    }
+
+    // Empty username string is a valid string — must NOT trigger a Backend error
+    #[test]
+    fn empty_username_string_is_valid() {
+        let data = serde_json::json!({"username": "", "password": "hunter2"});
+        let result = extractor().extract(&data, None);
+        assert!(
+            result.is_ok(),
+            "Empty username string must not cause an error; got {result:?}"
+        );
+    }
+
+    // Empty password string is a valid string — must NOT trigger a Backend error
+    #[test]
+    fn empty_password_string_is_valid() {
+        let data = serde_json::json!({"username": "alice", "password": ""});
+        let result = extractor().extract(&data, None);
+        assert!(
+            result.is_ok(),
+            "Empty password string must not cause an error; got {result:?}"
+        );
+    }
+
+    // Extra fields in data must be silently ignored
+    #[test]
+    fn extra_fields_in_data_are_ignored() {
+        let data = serde_json::json!({
+            "username": "alice",
+            "password": "hunter2",
+            "rotation_period": 3600,
+            "engine": "rabbitmq",
+            "vhost": "/"
+        });
+        let result = extractor().extract(&data, Some(30));
+        assert!(
+            result.is_ok(),
+            "Extra fields in data must not cause an error; got {result:?}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Tier 3 — Property / Parameterized tests
+    // Invariants verified across multiple representative inputs.
+    // -----------------------------------------------------------------------
+
+    // Invariant: every positive lease duration maps to Some(expires_at)
+    #[test]
+    fn multiple_positive_lease_durations_all_produce_some_expires_at() {
+        let data = serde_json::json!({"username": "alice", "password": "hunter2"});
+        for &lease in &[1u64, 30, 300, 3600, 86400, 604800] {
+            let result = extractor()
+                .extract(&data, Some(lease))
+                .expect("Valid data must return Ok for any positive lease");
+            assert!(
+                result.expires_at.is_some(),
+                "Lease of {lease} seconds must produce Some(expires_at)"
+            );
+        }
+    }
+
+    // Invariant: both zero and None lease durations map to None expires_at
+    #[test]
+    fn zero_and_none_lease_durations_both_produce_none_expires_at() {
+        let data = serde_json::json!({"username": "alice", "password": "hunter2"});
+
+        let zero_result = extractor()
+            .extract(&data, Some(0))
+            .expect("Valid data with zero lease must return Ok");
+        assert!(
+            zero_result.expires_at.is_none(),
+            "Zero lease must produce None expires_at"
+        );
+
+        let none_result = extractor()
+            .extract(&data, None)
+            .expect("Valid data with None lease must return Ok");
+        assert!(
+            none_result.expires_at.is_none(),
+            "None lease must produce None expires_at"
+        );
+    }
+
+    // Invariant: for any valid (username, password) string pair, extract() reads both correctly
+    #[test]
+    fn various_username_password_combinations_are_all_extracted_correctly() {
+        let cases = [
+            ("alice", "s3cr3t"),
+            ("user@domain.com", "P@ss!w0rd#2024"),
+            ("user-with-dashes", "password with spaces"),
+            ("unicode_тест", "пароль"),
+            ("u", "p"),
+        ];
+        for (username, password) in &cases {
+            let data = serde_json::json!({"username": username, "password": password});
+            let cred = extractor().extract(&data, None).unwrap_or_else(|e| {
+                panic!("extract must succeed for username={username:?}: {e:?}")
+            });
+            assert_eq!(
+                &cred.username, username,
+                "Username mismatch for input {username:?}"
+            );
+            assert_eq!(
+                cred.password.expose_secret().as_str(),
+                *password,
+                "Password mismatch for input {password:?}"
+            );
+        }
+    }
+
+    // No-panic invariant: extract() must never panic on any well-formed JSON shape.
+    // A result of Ok or Err is both acceptable; a panic is not.
+    #[test]
+    fn extract_does_not_panic_on_various_data_shapes() {
+        let shapes = [
+            serde_json::json!({}),
+            serde_json::json!(null),
+            serde_json::json!([]),
+            serde_json::json!(42),
+            serde_json::json!(true),
+            serde_json::json!("just-a-string"),
+            serde_json::json!({"username": 1, "password": 2}),
+            serde_json::json!({"username": null, "password": null}),
+            serde_json::json!({"username": {"nested": "object"}, "password": "ok"}),
+            serde_json::json!({"username": [], "password": {}}),
+        ];
+        for shape in &shapes {
+            // Must not panic — Ok or Err is both acceptable.
+            let _ = extractor().extract(shape, None);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Constructor test: dynamic_credentials() delegates to with_extractor()
+    // -----------------------------------------------------------------------
+
+    // dynamic_credentials() must construct a VaultProvider without panicking.
+    //
+    // CURRENT STATE: panics with unimplemented!() → test FAILS (expected).
+    // AFTER IMPLEMENTATION: does not panic → test PASSES.
+    //
+    // The VaultClient is constructed against a local HTTP address;
+    // no network call is made by the constructor.
+    #[test]
+    fn dynamic_credentials_constructor_does_not_panic() {
+        use std::sync::Arc;
+        use vaultrs::client::{VaultClient, VaultClientSettingsBuilder};
+
+        let client = Arc::new(
+            VaultClient::new(
+                VaultClientSettingsBuilder::default()
+                    .address("http://127.0.0.1:8200")
+                    .token("test-token")
+                    .build()
+                    .expect("VaultClientSettings must build for test address"),
+            )
+            .expect("VaultClient::new must succeed for HTTP address"),
+        );
+
+        // This currently panics with unimplemented!() → test FAILS.
+        // After implementation it must return a VaultProvider without panicking.
+        let _provider = VaultProvider::<UsernamePassword>::dynamic_credentials(
+            client,
+            "rabbitmq",
+            "creds/queue-keeper",
+        );
+    }
+}
