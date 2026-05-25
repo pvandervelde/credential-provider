@@ -4,10 +4,11 @@
 // It requires the `vaultrs` crate with the `rustls` feature.
 
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use credential_provider_core::{
     BearerToken, BoxFuture, Credential, CredentialError, CredentialProvider, HmacSecret,
-    TlsClientCertificate, UsernamePassword,
+    SecretString, TlsClientCertificate, UsernamePassword,
 };
 use vaultrs::client::VaultClient;
 
@@ -163,6 +164,36 @@ impl<C: Credential> VaultProvider<C> {
 }
 
 // Convenience constructors for common engine patterns.
+
+/// Extracts a `UsernamePassword` credential from a dynamic Vault secrets engine response.
+///
+/// Reads `username` and `password` string fields from the `data` object and derives
+/// `expires_at` from `lease_duration_secs`. Used by `VaultProvider::dynamic_credentials`.
+struct DynamicCredentialsExtractor;
+
+impl VaultExtractor<UsernamePassword> for DynamicCredentialsExtractor {
+    fn extract(
+        &self,
+        data: &serde_json::Value,
+        lease_duration_secs: Option<u64>,
+    ) -> Result<UsernamePassword, CredentialError> {
+        let username = data["username"]
+            .as_str()
+            .ok_or_else(|| CredentialError::Backend("missing field: username".to_string()))?;
+        let password = data["password"]
+            .as_str()
+            .ok_or_else(|| CredentialError::Backend("missing field: password".to_string()))?;
+        let expires_at = lease_duration_secs
+            .filter(|&d| d > 0)
+            .map(|d| Instant::now() + Duration::from_secs(d));
+        Ok(UsernamePassword::new(
+            username.to_string(),
+            SecretString::from(password.to_owned()),
+            expires_at,
+        ))
+    }
+}
+
 impl VaultProvider<UsernamePassword> {
     /// Creates a provider for dynamic secrets engines (RabbitMQ, database, etc.)
     /// that issue `UsernamePassword` credentials with a lease duration.
@@ -176,13 +207,11 @@ impl VaultProvider<UsernamePassword> {
     /// The returned credential carries `expires_at` derived from Vault's
     /// `lease_duration` field.
     pub fn dynamic_credentials(
-        _client: Arc<VaultClient>,
-        _mount: impl Into<String>,
-        _path: impl Into<String>,
+        client: Arc<VaultClient>,
+        mount: impl Into<String>,
+        path: impl Into<String>,
     ) -> Self {
-        unimplemented!(
-            "See docs/spec/interfaces/vault-adapter.md — dynamic_credentials constructor"
-        )
+        Self::with_extractor(client, mount, path, DynamicCredentialsExtractor)
     }
 
     /// Creates a provider that reads a `UsernamePassword` from a KV v2 secret.
