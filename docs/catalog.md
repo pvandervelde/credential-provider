@@ -30,6 +30,7 @@ test utilities, and patterns that are candidates for reuse.
 | `lease_secs_from_raw` | `fn` | `credential-provider::vault` | Converts a raw Vault `lease_duration` (`i32`) to `Option<u64>`: positive → `Some(secs)`, zero or negative → `None`. Use wherever a Vault API response's `lease_duration` field must be converted to an optional expiry duration. | vault, lease, conversion |
 | `map_vaultrs_error` | `fn` | `credential-provider::vault` | Maps a `vaultrs::error::ClientError` to `CredentialError` using the classification table in `docs/spec/interfaces/vault-adapter.md`. Use wherever a `vaultrs` call result must cross the `CredentialError` boundary. | vault, error-mapping, error-handling |
 | `tls_in_error_chain` | `fn` | `credential-provider::vault` | Walks the full `std::error::Error` source chain and returns `true` if any message contains TLS-related keywords. Use inside `RestClientError` arms to distinguish TLS failures from plain network failures. | vault, tls, error-handling, error-chain |
+| `extract_str_field` | `fn` | `credential-provider::vault` | Reads a named string field from a Vault response `data` JSON object. Returns `CredentialError::Backend("missing field: {name}")` when the field is absent or not a JSON string. Use in every `VaultExtractor` impl that needs to pull a string value from the response `data`. | vault, extractor, json, error-handling |
 
 ---
 
