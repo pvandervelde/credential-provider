@@ -1274,4 +1274,66 @@ mod dynamic_credentials_extractor {
             "creds/queue-keeper",
         );
     }
+
+    // -----------------------------------------------------------------------
+    // Security invariant S-2: CredentialError messages must never contain
+    // credential values — only field names, paths, and status codes.
+    // See docs/spec/security.md §S-2 and docs/spec/constraints.md §"Errors are safe".
+    //
+    // The implementation is correct today. These tests act as regression guards:
+    // a refactor that naively adds the field value to the error message for
+    // debugging (e.g. format!("missing field: {field}, got: {}", data[field]))
+    // would silently pass all other tests but fail here.
+    // -----------------------------------------------------------------------
+
+    // S-2 guard: type-mismatch on "username" — the numeric sentinel value
+    // must not appear anywhere in the Backend error message.
+    #[test]
+    fn username_type_mismatch_error_does_not_contain_field_value() {
+        let sentinel = 88771;
+        let data = serde_json::json!({"username": sentinel, "password": "hunter2"});
+        match extractor().extract(&data, None) {
+            Err(CredentialError::Backend(msg)) => {
+                assert!(
+                    !msg.contains(&sentinel.to_string()),
+                    "S-2 violation: field value ({sentinel}) must not appear in error message; got: {msg}"
+                );
+            }
+            other => panic!("Expected Err(Backend) for type-mismatch, got {other:?}"),
+        }
+    }
+
+    // S-2 guard: type-mismatch on "password" — the numeric sentinel value
+    // must not appear anywhere in the Backend error message.
+    #[test]
+    fn password_type_mismatch_error_does_not_contain_field_value() {
+        let sentinel = 99443;
+        let data = serde_json::json!({"username": "alice", "password": sentinel});
+        match extractor().extract(&data, None) {
+            Err(CredentialError::Backend(msg)) => {
+                assert!(
+                    !msg.contains(&sentinel.to_string()),
+                    "S-2 violation: field value ({sentinel}) must not appear in error message; got: {msg}"
+                );
+            }
+            other => panic!("Expected Err(Backend) for type-mismatch, got {other:?}"),
+        }
+    }
+
+    // S-2 guard (cross-field): when "username" is missing, the error message
+    // must not contain the value of any other present field (e.g. the password).
+    #[test]
+    fn missing_field_error_does_not_contain_other_field_values() {
+        let password_sentinel = "super-secret-do-not-leak-8a3f";
+        let data = serde_json::json!({"password": password_sentinel}); // username absent
+        match extractor().extract(&data, None) {
+            Err(CredentialError::Backend(msg)) => {
+                assert!(
+                    !msg.contains(password_sentinel),
+                    "S-2 violation: password value must not appear in missing-username error; got: {msg}"
+                );
+            }
+            other => panic!("Expected Err(Backend) for missing username, got {other:?}"),
+        }
+    }
 }
