@@ -177,12 +177,8 @@ impl VaultExtractor<UsernamePassword> for DynamicCredentialsExtractor {
         data: &serde_json::Value,
         lease_duration_secs: Option<u64>,
     ) -> Result<UsernamePassword, CredentialError> {
-        let username = data["username"]
-            .as_str()
-            .ok_or_else(|| CredentialError::Backend("missing field: username".to_string()))?;
-        let password = data["password"]
-            .as_str()
-            .ok_or_else(|| CredentialError::Backend("missing field: password".to_string()))?;
+        let username = extract_str_field(data, "username")?;
+        let password = extract_str_field(data, "password")?;
         let expires_at = lease_duration_secs
             .filter(|&d| d > 0)
             .map(|d| Instant::now() + Duration::from_secs(d));
@@ -335,6 +331,16 @@ pub(crate) fn lease_secs_from_raw(duration: i32) -> Option<u64> {
     } else {
         None
     }
+}
+
+/// Reads a string field from a Vault response `data` object.
+///
+/// Returns `CredentialError::Backend("missing field: {field}")` if the field is
+/// absent or not a JSON string.
+fn extract_str_field<'a>(data: &'a serde_json::Value, field: &str) -> Result<&'a str, CredentialError> {
+    data[field]
+        .as_str()
+        .ok_or_else(|| CredentialError::Backend(format!("missing field: {field}")))
 }
 
 /// Returns `true` if any error in the `std::error::Error` source chain contains

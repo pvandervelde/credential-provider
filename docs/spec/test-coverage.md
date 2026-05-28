@@ -115,7 +115,7 @@ Maps behavioral assertions to test cases. Updated when new test suites are added
 **Source:** `credential-provider/src/vault_tests.rs` (linked via `#[path]` in `vault.rs`)
 **Criticality:** Domain business logic — Tiers 1 + 2 + 3 required
 **Feature gate:** `vault`
-**Status:** GREEN — 66 passing, 0 failing, 2 ignored (integration); mutation score 100% (10/10 viable)
+**Status:** GREEN — 96 passing, 0 failing, 2 ignored (integration); mutation score 100% (28/28 viable)
 
 ### Specification Tests (Tier 1 — from assertions.md A-VAULT-*)
 
@@ -172,3 +172,96 @@ Maps behavioral assertions to test cases. Updated when new test suites are added
 - `get()` lease_duration mapping (tests 13 and 14) is not covered by unit tests — requires an HTTP-level mock or a live Vault instance. Tracked as `#[ignore]` integration test placeholders.
 - `map_vaultrs_error` for `RestClientError` variants other than `RequestError` (e.g., `ServerResponseError`, `ReqwestBuildError`) is not explicitly tested; they fall through to the "any other" → Backend path.
 - Property-based testing with `proptest` across arbitrary API error codes is not included; the Tier 3 tests use a fixed set of representative 5xx codes.
+
+---
+
+## VaultProvider — Task 4.0: DynamicCredentialsExtractor and VaultProvider\<UsernamePassword\>
+
+**Source:** `credential-provider/src/vault_tests.rs` — `mod dynamic_credentials_extractor`
+**Criticality:** Domain business logic — mutation score target: 85%
+**Feature gate:** `vault`
+**Status:** GREEN — 96 passing, 0 failing, 2 ignored (integration); mutation score 100% (28/28 viable)
+
+### Specification Tests (Tier 1 — A-VAULT-DYN-1, extractor level)
+
+| Assertion | Test name |
+|---|---|
+| A-VAULT-DYN-1: valid data + positive lease → Ok | `dynamic_credentials_extractor::valid_data_with_positive_lease_returns_ok` |
+| A-VAULT-DYN-1: positive lease → expires_at is Some | `dynamic_credentials_extractor::valid_data_positive_lease_sets_some_expires_at` |
+| A-VAULT-DYN-1: zero lease → expires_at is None | `dynamic_credentials_extractor::valid_data_zero_lease_returns_none_expires_at` |
+| A-VAULT-DYN-1: None lease → expires_at is None | `dynamic_credentials_extractor::valid_data_none_lease_returns_none_expires_at` |
+
+### Adversarial / Boundary Tests (Tier 2)
+
+| Scenario | Test name |
+|---|---|
+| Missing "username" field → Err(Backend) | `dynamic_credentials_extractor::missing_username_returns_backend_error` |
+| Missing "password" field → Err(Backend) | `dynamic_credentials_extractor::missing_password_returns_backend_error` |
+| Missing-username error contains "username" | `dynamic_credentials_extractor::missing_username_error_message_contains_field_name` |
+| Missing-password error contains "password" | `dynamic_credentials_extractor::missing_password_error_message_contains_field_name` |
+| Username as number → Err(Backend) | `dynamic_credentials_extractor::username_as_number_returns_backend_error` |
+| Password as bool → Err(Backend) | `dynamic_credentials_extractor::password_as_bool_returns_backend_error` |
+| Username as null → Err(Backend) | `dynamic_credentials_extractor::username_as_null_returns_backend_error` |
+| Username as array → Err(Backend) | `dynamic_credentials_extractor::username_as_array_returns_backend_error` |
+| Extracted username matches data["username"] (stub-killer) | `dynamic_credentials_extractor::extracted_username_matches_data_username_field` |
+| Extracted password matches data["password"] (stub-killer) | `dynamic_credentials_extractor::extracted_password_matches_data_password_field` |
+| Different inputs → different usernames (stub-killer) | `dynamic_credentials_extractor::different_data_produces_different_extracted_usernames` |
+| Different inputs → different passwords (stub-killer) | `dynamic_credentials_extractor::different_data_produces_different_extracted_passwords` |
+| Lease == 1 (boundary) → Some(expires_at) | `dynamic_credentials_extractor::lease_boundary_one_second_produces_some_expires_at` |
+| expires_at ≈ now + lease_duration (stub-killer for expiry math) | `dynamic_credentials_extractor::expires_at_is_approximately_now_plus_lease_duration` |
+| Empty username string is valid | `dynamic_credentials_extractor::empty_username_string_is_valid` |
+| Empty password string is valid | `dynamic_credentials_extractor::empty_password_string_is_valid` |
+| Extra fields in data are ignored | `dynamic_credentials_extractor::extra_fields_in_data_are_ignored` |
+| dynamic_credentials() constructor does not panic | `dynamic_credentials_extractor::dynamic_credentials_constructor_does_not_panic` |
+
+### Property / Parameterized Tests (Tier 3)
+
+| Scenario | Test name |
+|---|---|
+| All positive lease durations [1, 30, 300, 3600, 86400, 604800] → Some(expires_at) | `dynamic_credentials_extractor::multiple_positive_lease_durations_all_produce_some_expires_at` |
+| Both zero and None leases → None expires_at | `dynamic_credentials_extractor::zero_and_none_lease_durations_both_produce_none_expires_at` |
+| Diverse (username, password) pairs all extracted correctly | `dynamic_credentials_extractor::various_username_password_combinations_are_all_extracted_correctly` |
+| No panic on any well-formed JSON shape | `dynamic_credentials_extractor::extract_does_not_panic_on_various_data_shapes` |
+
+### Audit Report — Task 4.0
+
+#### Tier 4 — Mutation Testing (cargo-mutants)
+
+| Module | Score | Target | Status |
+|--------|-------|--------|--------|
+| `credential-provider/src/vault.rs` | 100% (28/28) | 85% | ✅ |
+
+**Survivors found:** 0  
+**Survivors killed:** 0 (none required)  
+**New kill tests added:** 0  
+**Report:** `docs/spec/mutation-report-task4.0-vault.json`
+
+All 28 viable mutants were caught by the existing test suite. No new kill tests were required.
+
+Key mutants caught in the new `DynamicCredentialsExtractor` code (lines 180–184):
+
+| Mutant | Caught by |
+|--------|-----------|
+| `extract → Ok(Default::default())` (line 180) | `extracted_username_matches_data_username_field`, `extracted_password_matches_data_password_field` |
+| `filter > to ==` for zero-lease (line 183) | `valid_data_zero_lease_returns_none_expires_at`, `zero_and_none_lease_durations_both_produce_none_expires_at` |
+| `filter > to <` for zero-lease (line 183) | `lease_boundary_one_second_produces_some_expires_at` |
+| `+ to -` for expiry calculation (line 184) | `expires_at_is_approximately_now_plus_lease_duration` |
+| `+ to *` for expiry calculation (line 184) | `expires_at_is_approximately_now_plus_lease_duration` |
+| `extract_str_field → Ok("")` (line 341) | `extracted_username_matches_data_username_field`, `extracted_password_matches_data_password_field` |
+| `extract_str_field → Ok("xyzzy")` (line 341) | `extracted_username_matches_data_username_field`, `extracted_password_matches_data_password_field` |
+
+#### Tier 5 — Fuzz Testing
+
+The existing fuzz target `fuzz/fuzz_targets/fuzz_caching.rs` covers only the `CachingCredentialProvider` state machine. It does **not** cover `extract_str_field` or `DynamicCredentialsExtractor::extract()`.
+
+**Assessment:** `extract_str_field` receives untrusted JSON from the Vault API response, making it a candidate for fuzz coverage. However, per task scope, creating a new fuzz target is deferred to a separate fuzz infrastructure task. The no-panic invariant is covered by `extract_does_not_panic_on_various_data_shapes` (unit test) and by the type-safety of `serde_json::Value` indexing.
+
+**New fuzz targets created:** 0 (out of scope for this task)
+
+#### Tier 6 — Formal Verification
+
+Not required — domain-logic criticality tier.
+
+#### Verdict: CLEAR
+
+No survivors, no crashes, no blockers.
