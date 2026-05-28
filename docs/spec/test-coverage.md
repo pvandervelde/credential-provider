@@ -180,7 +180,7 @@ Maps behavioral assertions to test cases. Updated when new test suites are added
 **Source:** `credential-provider/src/vault_tests.rs` — `mod dynamic_credentials_extractor`
 **Criticality:** Domain business logic — mutation score target: 85%
 **Feature gate:** `vault`
-**Status:** GREEN — 96 passing, 0 failing, 2 ignored (integration); mutation score 100% (28/28 viable)
+**Status:** GREEN — 99 passing, 0 failing, 2 ignored (integration); mutation score 100% (28/28 viable)
 
 ### Specification Tests (Tier 1 — A-VAULT-DYN-1, extractor level)
 
@@ -222,6 +222,14 @@ Maps behavioral assertions to test cases. Updated when new test suites are added
 | Both zero and None leases → None expires_at | `dynamic_credentials_extractor::zero_and_none_lease_durations_both_produce_none_expires_at` |
 | Diverse (username, password) pairs all extracted correctly | `dynamic_credentials_extractor::various_username_password_combinations_are_all_extracted_correctly` |
 | No panic on any well-formed JSON shape | `dynamic_credentials_extractor::extract_does_not_panic_on_various_data_shapes` |
+
+### Security Invariant Tests — S-2 (error messages must not contain credential values)
+
+| Scenario | Test name |
+|---|---|
+| S-2: username type-mismatch error does not contain the numeric field value | `dynamic_credentials_extractor::username_type_mismatch_error_does_not_contain_field_value` |
+| S-2: password type-mismatch error does not contain the numeric field value | `dynamic_credentials_extractor::password_type_mismatch_error_does_not_contain_field_value` |
+| S-2: missing-field error does not contain values from other present fields | `dynamic_credentials_extractor::missing_field_error_does_not_contain_other_field_values` |
 
 ### Audit Report — Task 4.0
 

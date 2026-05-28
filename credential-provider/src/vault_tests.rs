@@ -844,17 +844,9 @@ mod catch_all_arm_spec {
 // -------------------------------------------------------------------------
 // DynamicCredentialsExtractor tests
 //
-// Covers A-VAULT-DYN-1 (extractor-level assertions).
-// A-VAULT-DYN-2 through A-VAULT-DYN-6 are already covered by
-// error_mapping_spec above.
-//
-// NOTE: Tests that reference `super::super::DynamicCredentialsExtractor`
-// will NOT COMPILE until DynamicCredentialsExtractor is declared in vault.rs.
-// The constructor test `dynamic_credentials_constructor_does_not_panic`
-// compiles now (VaultProvider::dynamic_credentials already exists) but
-// FAILS at runtime because the function panics with unimplemented!().
-//
-// This is the expected pre-implementation (TDD) state.
+// Covers A-VAULT-DYN-1 (extractor-level assertions) and the S-2 security
+// invariant (error messages must never contain credential values).
+// A-VAULT-DYN-2 through A-VAULT-DYN-6 are covered by error_mapping_spec.
 // -------------------------------------------------------------------------
 
 mod dynamic_credentials_extractor {
@@ -1266,8 +1258,6 @@ mod dynamic_credentials_extractor {
             .expect("VaultClient::new must succeed for HTTP address"),
         );
 
-        // This currently panics with unimplemented!() → test FAILS.
-        // After implementation it must return a VaultProvider without panicking.
         let _provider = VaultProvider::<UsernamePassword>::dynamic_credentials(
             client,
             "rabbitmq",
