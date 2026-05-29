@@ -184,7 +184,7 @@ impl VaultExtractor<UsernamePassword> for DynamicCredentialsExtractor {
             .map(|d| Instant::now() + Duration::from_secs(d));
         Ok(UsernamePassword::new(
             username.to_string(),
-            SecretString::from(password.to_owned()),
+            SecretString::new(password.to_string()),
             expires_at,
         ))
     }
@@ -337,7 +337,10 @@ pub(crate) fn lease_secs_from_raw(duration: i32) -> Option<u64> {
 ///
 /// Returns `CredentialError::Backend("missing field: {field}")` if the field is
 /// absent or not a JSON string.
-fn extract_str_field<'a>(data: &'a serde_json::Value, field: &str) -> Result<&'a str, CredentialError> {
+fn extract_str_field<'a>(
+    data: &'a serde_json::Value,
+    field: &str,
+) -> Result<&'a str, CredentialError> {
     data[field]
         .as_str()
         .ok_or_else(|| CredentialError::Backend(format!("missing field: {field}")))
