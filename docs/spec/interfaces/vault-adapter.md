@@ -99,6 +99,10 @@ impl VaultExtractor<UsernamePassword> for MyEngineExtractor {
 }
 ```
 
+> **Note for contributors adding extractors inside `credential-provider/src/vault.rs`:**
+> Use the crate-internal `extract_str_field(data, "field")` helper instead of the
+> inline `.as_str().ok_or_else(...)` pattern shown above. See `docs/catalog.md`.
+
 ---
 
 ## `VaultProvider<C>` (struct)

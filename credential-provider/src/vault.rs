@@ -4,10 +4,11 @@
 // It requires the `vaultrs` crate with the `rustls` feature.
 
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use credential_provider_core::{
     BearerToken, BoxFuture, Credential, CredentialError, CredentialProvider, HmacSecret,
-    TlsClientCertificate, UsernamePassword,
+    SecretString, TlsClientCertificate, UsernamePassword,
 };
 use vaultrs::client::VaultClient;
 
@@ -163,6 +164,32 @@ impl<C: Credential> VaultProvider<C> {
 }
 
 // Convenience constructors for common engine patterns.
+
+/// Extracts a `UsernamePassword` credential from a dynamic Vault secrets engine response.
+///
+/// Reads `username` and `password` string fields from the `data` object and derives
+/// `expires_at` from `lease_duration_secs`. Used by `VaultProvider::dynamic_credentials`.
+struct DynamicCredentialsExtractor;
+
+impl VaultExtractor<UsernamePassword> for DynamicCredentialsExtractor {
+    fn extract(
+        &self,
+        data: &serde_json::Value,
+        lease_duration_secs: Option<u64>,
+    ) -> Result<UsernamePassword, CredentialError> {
+        let username = extract_str_field(data, "username")?;
+        let password = extract_str_field(data, "password")?;
+        let expires_at = lease_duration_secs
+            .filter(|&d| d > 0)
+            .map(|d| Instant::now() + Duration::from_secs(d));
+        Ok(UsernamePassword::new(
+            username.to_string(),
+            SecretString::new(password.to_string()),
+            expires_at,
+        ))
+    }
+}
+
 impl VaultProvider<UsernamePassword> {
     /// Creates a provider for dynamic secrets engines (RabbitMQ, database, etc.)
     /// that issue `UsernamePassword` credentials with a lease duration.
@@ -176,13 +203,11 @@ impl VaultProvider<UsernamePassword> {
     /// The returned credential carries `expires_at` derived from Vault's
     /// `lease_duration` field.
     pub fn dynamic_credentials(
-        _client: Arc<VaultClient>,
-        _mount: impl Into<String>,
-        _path: impl Into<String>,
+        client: Arc<VaultClient>,
+        mount: impl Into<String>,
+        path: impl Into<String>,
     ) -> Self {
-        unimplemented!(
-            "See docs/spec/interfaces/vault-adapter.md — dynamic_credentials constructor"
-        )
+        Self::with_extractor(client, mount, path, DynamicCredentialsExtractor)
     }
 
     /// Creates a provider that reads a `UsernamePassword` from a KV v2 secret.
@@ -306,6 +331,19 @@ pub(crate) fn lease_secs_from_raw(duration: i32) -> Option<u64> {
     } else {
         None
     }
+}
+
+/// Reads a string field from a Vault response `data` object.
+///
+/// Returns `CredentialError::Backend("missing field: {field}")` if the field is
+/// absent or not a JSON string.
+fn extract_str_field<'a>(
+    data: &'a serde_json::Value,
+    field: &str,
+) -> Result<&'a str, CredentialError> {
+    data[field]
+        .as_str()
+        .ok_or_else(|| CredentialError::Backend(format!("missing field: {field}")))
 }
 
 /// Returns `true` if any error in the `std::error::Error` source chain contains

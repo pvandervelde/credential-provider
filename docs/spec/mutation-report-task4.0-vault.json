@@ -1,0 +1,842 @@
+[
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "VaultProvider<HmacSecret>::kv2_secret",
+      "return_type": "-> Self",
+      "span": {
+        "start": {
+          "line": 238,
+          "column": 5
+        },
+        "end": {
+          "line": 255,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 254,
+        "column": 9
+      },
+      "end": {
+        "line": 254,
+        "column": 93
+      }
+    },
+    "replacement": "Default::default()",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "lease_secs_from_raw",
+      "return_type": "-> Option<u64>",
+      "span": {
+        "start": {
+          "line": 323,
+          "column": 1
+        },
+        "end": {
+          "line": 334,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 329,
+        "column": 5
+      },
+      "end": {
+        "line": 333,
+        "column": 6
+      }
+    },
+    "replacement": "Some(0)",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "<impl CredentialProvider for VaultProvider<C>>::get",
+      "return_type": "-> BoxFuture<'_, Result<C, CredentialError>>",
+      "span": {
+        "start": {
+          "line": 301,
+          "column": 5
+        },
+        "end": {
+          "line": 316,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 302,
+        "column": 9
+      },
+      "end": {
+        "line": 315,
+        "column": 11
+      }
+    },
+    "replacement": "BoxFuture::new(Ok(Default::default()))",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "lease_secs_from_raw",
+      "return_type": "-> Option<u64>",
+      "span": {
+        "start": {
+          "line": 323,
+          "column": 1
+        },
+        "end": {
+          "line": 334,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 329,
+        "column": 5
+      },
+      "end": {
+        "line": 333,
+        "column": 6
+      }
+    },
+    "replacement": "None",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "VaultProvider<UsernamePassword>::kv2_username_password",
+      "return_type": "-> Self",
+      "span": {
+        "start": {
+          "line": 213,
+          "column": 5
+        },
+        "end": {
+          "line": 234,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 231,
+        "column": 9
+      },
+      "end": {
+        "line": 233,
+        "column": 10
+      }
+    },
+    "replacement": "Default::default()",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "map_vaultrs_error",
+      "return_type": "-> CredentialError",
+      "span": {
+        "start": {
+          "line": 364,
+          "column": 1
+        },
+        "end": {
+          "line": 421,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 388,
+        "column": 20
+      },
+      "end": {
+        "line": 388,
+        "column": 22
+      }
+    },
+    "replacement": "<",
+    "genre": "BinaryOperator"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "lease_secs_from_raw",
+      "return_type": "-> Option<u64>",
+      "span": {
+        "start": {
+          "line": 323,
+          "column": 1
+        },
+        "end": {
+          "line": 334,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 329,
+        "column": 17
+      },
+      "end": {
+        "line": 329,
+        "column": 18
+      }
+    },
+    "replacement": "<",
+    "genre": "BinaryOperator"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "lease_secs_from_raw",
+      "return_type": "-> Option<u64>",
+      "span": {
+        "start": {
+          "line": 323,
+          "column": 1
+        },
+        "end": {
+          "line": 334,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 329,
+        "column": 17
+      },
+      "end": {
+        "line": 329,
+        "column": 18
+      }
+    },
+    "replacement": "==",
+    "genre": "BinaryOperator"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "extract_str_field",
+      "return_type": "-> Result<&'a str, CredentialError>",
+      "span": {
+        "start": {
+          "line": 336,
+          "column": 1
+        },
+        "end": {
+          "line": 344,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 341,
+        "column": 5
+      },
+      "end": {
+        "line": 343,
+        "column": 84
+      }
+    },
+    "replacement": "Ok(\"\")",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "<impl VaultExtractor for DynamicCredentialsExtractor>::extract",
+      "return_type": "-> Result<UsernamePassword, CredentialError>",
+      "span": {
+        "start": {
+          "line": 175,
+          "column": 5
+        },
+        "end": {
+          "line": 190,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 180,
+        "column": 9
+      },
+      "end": {
+        "line": 189,
+        "column": 11
+      }
+    },
+    "replacement": "Ok(Default::default())",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "<impl VaultExtractor for DynamicCredentialsExtractor>::extract",
+      "return_type": "-> Result<UsernamePassword, CredentialError>",
+      "span": {
+        "start": {
+          "line": 175,
+          "column": 5
+        },
+        "end": {
+          "line": 190,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 184,
+        "column": 37
+      },
+      "end": {
+        "line": 184,
+        "column": 38
+      }
+    },
+    "replacement": "-",
+    "genre": "BinaryOperator"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "VaultProvider<UsernamePassword>::dynamic_credentials",
+      "return_type": "-> Self",
+      "span": {
+        "start": {
+          "line": 194,
+          "column": 5
+        },
+        "end": {
+          "line": 211,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 210,
+        "column": 9
+      },
+      "end": {
+        "line": 210,
+        "column": 79
+      }
+    },
+    "replacement": "Default::default()",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "VaultProvider<TlsClientCertificate>::pki_certificate",
+      "return_type": "-> Self",
+      "span": {
+        "start": {
+          "line": 280,
+          "column": 5
+        },
+        "end": {
+          "line": 297,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 296,
+        "column": 9
+      },
+      "end": {
+        "line": 296,
+        "column": 98
+      }
+    },
+    "replacement": "Default::default()",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "<impl VaultExtractor for DynamicCredentialsExtractor>::extract",
+      "return_type": "-> Result<UsernamePassword, CredentialError>",
+      "span": {
+        "start": {
+          "line": 175,
+          "column": 5
+        },
+        "end": {
+          "line": 190,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 183,
+        "column": 28
+      },
+      "end": {
+        "line": 183,
+        "column": 29
+      }
+    },
+    "replacement": "==",
+    "genre": "BinaryOperator"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "tls_in_error_chain",
+      "return_type": "-> bool",
+      "span": {
+        "start": {
+          "line": 346,
+          "column": 1
+        },
+        "end": {
+          "line": 362,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 349,
+        "column": 5
+      },
+      "end": {
+        "line": 361,
+        "column": 10
+      }
+    },
+    "replacement": "true",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "VaultProvider<C>::with_extractor",
+      "return_type": "-> Self",
+      "span": {
+        "start": {
+          "line": 148,
+          "column": 5
+        },
+        "end": {
+          "line": 163,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 157,
+        "column": 9
+      },
+      "end": {
+        "line": 162,
+        "column": 10
+      }
+    },
+    "replacement": "Default::default()",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "map_vaultrs_error",
+      "return_type": "-> CredentialError",
+      "span": {
+        "start": {
+          "line": 364,
+          "column": 1
+        },
+        "end": {
+          "line": 421,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 377,
+        "column": 5
+      },
+      "end": {
+        "line": 420,
+        "column": 6
+      }
+    },
+    "replacement": "Default::default()",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "tls_in_error_chain",
+      "return_type": "-> bool",
+      "span": {
+        "start": {
+          "line": 346,
+          "column": 1
+        },
+        "end": {
+          "line": 362,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 349,
+        "column": 5
+      },
+      "end": {
+        "line": 361,
+        "column": 10
+      }
+    },
+    "replacement": "false",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "lease_secs_from_raw",
+      "return_type": "-> Option<u64>",
+      "span": {
+        "start": {
+          "line": 323,
+          "column": 1
+        },
+        "end": {
+          "line": 334,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 329,
+        "column": 5
+      },
+      "end": {
+        "line": 333,
+        "column": 6
+      }
+    },
+    "replacement": "Some(1)",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "<impl CredentialProvider for VaultProvider<C>>::get",
+      "return_type": "-> BoxFuture<'_, Result<C, CredentialError>>",
+      "span": {
+        "start": {
+          "line": 301,
+          "column": 5
+        },
+        "end": {
+          "line": 316,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 302,
+        "column": 9
+      },
+      "end": {
+        "line": 315,
+        "column": 11
+      }
+    },
+    "replacement": "BoxFuture::new()",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "tls_in_error_chain",
+      "return_type": "-> bool",
+      "span": {
+        "start": {
+          "line": 346,
+          "column": 1
+        },
+        "end": {
+          "line": 362,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 356,
+        "column": 61
+      },
+      "end": {
+        "line": 356,
+        "column": 63
+      }
+    },
+    "replacement": "&&",
+    "genre": "BinaryOperator"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "<impl VaultExtractor for DynamicCredentialsExtractor>::extract",
+      "return_type": "-> Result<UsernamePassword, CredentialError>",
+      "span": {
+        "start": {
+          "line": 175,
+          "column": 5
+        },
+        "end": {
+          "line": 190,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 183,
+        "column": 28
+      },
+      "end": {
+        "line": 183,
+        "column": 29
+      }
+    },
+    "replacement": "<",
+    "genre": "BinaryOperator"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "<impl CredentialProvider for VaultProvider<C>>::get",
+      "return_type": "-> BoxFuture<'_, Result<C, CredentialError>>",
+      "span": {
+        "start": {
+          "line": 301,
+          "column": 5
+        },
+        "end": {
+          "line": 316,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 302,
+        "column": 9
+      },
+      "end": {
+        "line": 315,
+        "column": 11
+      }
+    },
+    "replacement": "BoxFuture::from_iter([Ok(Default::default())])",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "<impl VaultExtractor for DynamicCredentialsExtractor>::extract",
+      "return_type": "-> Result<UsernamePassword, CredentialError>",
+      "span": {
+        "start": {
+          "line": 175,
+          "column": 5
+        },
+        "end": {
+          "line": 190,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 184,
+        "column": 37
+      },
+      "end": {
+        "line": 184,
+        "column": 38
+      }
+    },
+    "replacement": "*",
+    "genre": "BinaryOperator"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "extract_str_field",
+      "return_type": "-> Result<&'a str, CredentialError>",
+      "span": {
+        "start": {
+          "line": 336,
+          "column": 1
+        },
+        "end": {
+          "line": 344,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 341,
+        "column": 5
+      },
+      "end": {
+        "line": 343,
+        "column": 84
+      }
+    },
+    "replacement": "Ok(\"xyzzy\")",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "tls_in_error_chain",
+      "return_type": "-> bool",
+      "span": {
+        "start": {
+          "line": 346,
+          "column": 1
+        },
+        "end": {
+          "line": 362,
+          "column": 2
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 356,
+        "column": 32
+      },
+      "end": {
+        "line": 356,
+        "column": 34
+      }
+    },
+    "replacement": "&&",
+    "genre": "BinaryOperator"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "<impl CredentialProvider for VaultProvider<C>>::get",
+      "return_type": "-> BoxFuture<'_, Result<C, CredentialError>>",
+      "span": {
+        "start": {
+          "line": 301,
+          "column": 5
+        },
+        "end": {
+          "line": 316,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 302,
+        "column": 9
+      },
+      "end": {
+        "line": 315,
+        "column": 11
+      }
+    },
+    "replacement": "BoxFuture::from(Ok(Default::default()))",
+    "genre": "FnValue"
+  },
+  {
+    "package": "credential-provider",
+    "file": "credential-provider/src/vault.rs",
+    "function": {
+      "function_name": "VaultProvider<BearerToken>::kv2_bearer_token",
+      "return_type": "-> Self",
+      "span": {
+        "start": {
+          "line": 259,
+          "column": 5
+        },
+        "end": {
+          "line": 276,
+          "column": 6
+        }
+      }
+    },
+    "span": {
+      "start": {
+        "line": 275,
+        "column": 9
+      },
+      "end": {
+        "line": 275,
+        "column": 99
+      }
+    },
+    "replacement": "Default::default()",
+    "genre": "FnValue"
+  }
+]
