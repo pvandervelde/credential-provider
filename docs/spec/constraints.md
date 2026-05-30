@@ -127,6 +127,16 @@ aws   = ["dep:aws-config", "dep:aws-credential-types"]
 | `tracing` | 0.1 | Observability facade for structured logging (see ADR-005) |
 | `metrics` | 0.24 | Observability facade for counters and gauges (see ADR-005) |
 
+### vaultrs version bumps
+
+Any PR bumping the `vaultrs` dependency must manually audit the catch-all arm in
+`map_vaultrs_error` (`credential-provider/src/vault.rs`). New `ClientError` variants
+in a `vaultrs` release may have `Display` output that contains sensitive data; the
+catch-all arm forwards that output directly into `CredentialError::Backend` messages.
+Reference: `docs/security-review/2026-05-27-task-4.0-dynamic-credentials.md` §FINDING-002.
+
+---
+
 ### Forbidden Dependencies in Core
 
 The following must never appear in `credential-provider-core`:
