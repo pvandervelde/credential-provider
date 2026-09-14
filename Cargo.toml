@@ -36,7 +36,7 @@ aws-config           = { version = "1" }
 aws-credential-types = { version = "1" }
 
 # JSON parsing — used by vault feature; mark optional = true in member Cargo.toml
-serde_json = { version = "1" }
+serde_json = { version = "1.0.151" }
 
 # Test helpers for vault error construction — rustify is a transitive dep of vaultrs 0.8;
 # pin to the same minor to ensure test error variants match production types exactly.
