@@ -11,11 +11,11 @@ jobs:
             pull-requests: write
             id-token: write
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
               with:
                   fetch-depth: 1
 
-            - uses: anthropics/claude-code-action@v1
+            - uses: anthropics/claude-code-action@9cdae7f0d995e3ba7c33f226087fdf82a59cd520 # v1
               with:
                   claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
                   track_progress: true # ✨ Enables tracking comments
